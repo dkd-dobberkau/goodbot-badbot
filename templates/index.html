@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>goodbot-badbot.com</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script>
+  // Set theme before stylesheet applies to prevent flash of wrong theme
+  (function () {
+    var stored = localStorage.getItem('theme');
+    var prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+    document.documentElement.setAttribute('data-theme', stored || (prefersLight ? 'light' : 'dark'));
+  })();
+</script>
+<style>
+  :root, [data-theme="dark"] {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --border: #1e1e1e;
+    --row-border: #161616;
+    --green: #00ff87;
+    --red: #ff3b3b;
+    --yellow: #ffd166;
+    --dim: #444;
+    --text: #e8e8e8;
+    --muted: #666;
+    --code-text: #555;
+    --code-comment: #333;
+    --verdict-bad-bg: rgba(255,59,59,0.1);
+    --verdict-bad-border: rgba(255,59,59,0.2);
+    --verdict-good-bg: rgba(0,255,135,0.08);
+    --verdict-good-border: rgba(0,255,135,0.15);
+  }
+
+  [data-theme="light"] {
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --border: #e2e2e2;
+    --row-border: #efefef;
+    --green: #00a05a;
+    --red: #d8261f;
+    --yellow: #b07a00;
+    --dim: #bcbcbc;
+    --text: #161616;
+    --muted: #6a6a6a;
+    --code-text: #7a7a7a;
+    --code-comment: #b8b8b8;
+    --verdict-bad-bg: rgba(216,38,31,0.08);
+    --verdict-bad-border: rgba(216,38,31,0.25);
+    --verdict-good-bg: rgba(0,160,90,0.08);
+    --verdict-good-border: rgba(0,160,90,0.25);
+  }
+
+  :root {
+    --mono: 'Space Mono', monospace;
+    --sans: 'DM Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+    transition: background 0.2s ease, color 0.2s ease;
+  }
+
+  /* HEADER */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 2rem 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+
+  .logo {
+    font-family: var(--mono);
+    font-size: 1.1rem;
+    letter-spacing: -0.02em;
+  }
+
+  .logo .good { color: var(--green); }
+  .logo .sep  { color: var(--dim); margin: 0 0.2em; }
+  .logo .bad  { color: var(--red); }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+  }
+
+  .theme-toggle {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.45rem 0.7rem;
+    cursor: pointer;
+    border-radius: 2px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    transition: color 0.2s ease, border-color 0.2s ease;
+  }
+
+  .theme-toggle:hover {
+    color: var(--text);
+    border-color: var(--muted);
+  }
+
+  .theme-toggle .icon {
+    width: 12px;
+    height: 12px;
+    display: inline-block;
+  }
+
+  [data-theme="dark"] .theme-toggle .icon-sun  { display: inline-block; }
+  [data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+  [data-theme="dark"] .theme-toggle .label::after { content: 'light'; }
+
+  [data-theme="light"] .theme-toggle .icon-sun  { display: none; }
+  [data-theme="light"] .theme-toggle .icon-moon { display: inline-block; }
+  [data-theme="light"] .theme-toggle .label::after { content: 'dark'; }
+
+  .live-dot {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  .live-dot::before {
+    content: '';
+    width: 7px; height: 7px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.2; }
+  }
+
+  /* HERO */
+  .hero {
+    padding: 4rem 3rem 3rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  h1 {
+    font-family: var(--mono);
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    line-height: 1.1;
+    font-weight: 700;
+    margin-bottom: 1rem;
+  }
+
+  h1 .line2 {
+    color: var(--muted);
+    font-size: 0.55em;
+    display: block;
+    margin-top: 0.3em;
+  }
+
+  .hero p {
+    color: var(--muted);
+    font-size: 0.95rem;
+    max-width: 540px;
+    line-height: 1.7;
+    font-weight: 300;
+  }
+
+  /* STATS ROW */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .stat-box {
+    padding: 2rem 3rem;
+    border-right: 1px solid var(--border);
+  }
+
+  .stat-box:last-child { border-right: none; }
+
+  .stat-label {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    margin-bottom: 0.6rem;
+  }
+
+  .stat-value {
+    font-family: var(--mono);
+    font-size: 2.8rem;
+    font-weight: 700;
+    line-height: 1;
+    transition: color 0.3s;
+  }
+
+  .stat-value.red   { color: var(--red); }
+  .stat-value.green { color: var(--green); }
+  .stat-value.yellow{ color: var(--yellow); }
+
+  /* MAIN GRID */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    min-height: calc(100vh - 280px);
+  }
+
+  /* BOT TABLE */
+  .panel {
+    padding: 2.5rem 3rem;
+    border-right: 1px solid var(--border);
+  }
+
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1.8rem;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.88rem;
+  }
+
+  th {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-align: left;
+    padding: 0 0 0.8rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  td {
+    padding: 0.85rem 0;
+    border-bottom: 1px solid var(--row-border);
+    vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  .bot-name {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+  }
+
+  .operator {
+    color: var(--muted);
+    font-size: 0.8rem;
+  }
+
+  .verdict {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    padding: 0.25rem 0.6rem;
+    border-radius: 2px;
+  }
+
+  .verdict.bad {
+    background: var(--verdict-bad-bg);
+    color: var(--red);
+    border: 1px solid var(--verdict-bad-border);
+  }
+
+  .verdict.good {
+    background: var(--verdict-good-bg);
+    color: var(--green);
+    border: 1px solid var(--verdict-good-border);
+  }
+
+  .count {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--muted);
+    text-align: right;
+  }
+
+  .count.nonzero { color: var(--red); }
+
+  /* FEED PANEL */
+  .feed-panel {
+    padding: 2.5rem 2rem;
+    border-left: none;
+  }
+
+  .feed-item {
+    padding: 0.9rem 0;
+    border-bottom: 1px solid var(--row-border);
+    animation: fadeIn 0.5s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  .feed-item:last-child { border-bottom: none; }
+
+  .feed-time {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--dim);
+    margin-bottom: 0.3rem;
+  }
+
+  .feed-bot {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--red);
+    margin-bottom: 0.2rem;
+  }
+
+  .feed-path {
+    font-size: 0.75rem;
+    color: var(--muted);
+    word-break: break-all;
+  }
+
+  .empty-state {
+    color: var(--dim);
+    font-size: 0.85rem;
+    font-family: var(--mono);
+    padding: 2rem 0;
+    text-align: center;
+  }
+
+  .robots-box {
+    margin-top: 3rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .robots-header {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0.7rem 1rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .robots-content {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--code-text);
+    line-height: 1.8;
+    padding: 1rem;
+    white-space: pre;
+    overflow-x: auto;
+  }
+
+  .robots-content .disallow { color: var(--red); }
+  .robots-content .comment  { color: var(--code-comment); }
+  .robots-content .agent    { color: var(--yellow); }
+
+  /* FOOTER */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 1.5rem 3rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--dim);
+  }
+
+  @media (max-width: 900px) {
+    .main-grid { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: 1fr; }
+    .stat-box  { border-right: none; border-bottom: 1px solid var(--border); }
+    header, .hero, .panel, .feed-panel, footer { padding-left: 1.5rem; padding-right: 1.5rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="good">good</span><span class="sep">·</span><span class="bad">bad</span><span style="color:var(--muted)">bot</span>
+  </div>
+  <div class="header-right">
+    <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle theme">
+      <svg class="icon icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="4"></circle>
+        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+      </svg>
+      <svg class="icon icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+      </svg>
+      <span class="label"></span>
+    </button>
+    <div class="live-dot">monitoring</div>
+  </div>
+</header>
+
+<section class="hero">
+  <h1>
+    Who respects your robots.txt?
+    <span class="line2">AI crawler compliance, measured in the open.</span>
+  </h1>
+  <p>
+    This site runs honeypot paths explicitly blocked in <code style="font-family:var(--mono);color:var(--green);font-size:0.9em">/robots.txt</code>.
+    Every crawler that visits them is logged as a violation.
+    No guessing — just evidence.
+  </p>
+</section>
+
+<div class="stats-row">
+  <div class="stat-box">
+    <div class="stat-label">Total Violations</div>
+    <div class="stat-value red" id="totalViolations">—</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Bots Observed</div>
+    <div class="stat-value yellow" id="totalBots">—</div>
+  </div>
+  <div class="stat-box">
+    <div class="stat-label">Honeypot Paths</div>
+    <div class="stat-value green">6</div>
+  </div>
+</div>
+
+<div class="main-grid">
+  <div class="panel">
+    <div class="panel-title">Bot Compliance Scoreboard</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Bot</th>
+          <th>Operator</th>
+          <th>Verdict</th>
+          <th style="text-align:right">Violations</th>
+          <th style="text-align:right">Total Visits</th>
+        </tr>
+      </thead>
+      <tbody id="botTable">
+        <tr><td colspan="5" class="empty-state">Loading…</td></tr>
+      </tbody>
+    </table>
+
+    <div class="robots-box">
+      <div class="robots-header">robots.txt — honeypot config</div>
+      <div class="robots-content"><span class="comment"># All bots: honeypot paths blocked</span>
+<span class="agent">User-agent: *</span>
+<span class="disallow">Disallow: /do-not-crawl/</span>
+<span class="disallow">Disallow: /private/</span>
+<span class="disallow">Disallow: /honeypot/</span>
+<span class="disallow">Disallow: /training-data-forbidden/</span>
+<span class="disallow">Disallow: /no-ai-allowed/</span>
+<span class="disallow">Disallow: /robots-test/</span>
+
+<span class="comment"># Known AI crawlers: fully blocked</span>
+<span class="agent">User-agent: GPTBot</span>
+<span class="disallow">Disallow: /</span>
+<span class="agent">User-agent: ClaudeBot</span>
+<span class="disallow">Disallow: /</span>
+<span class="agent">User-agent: CCBot</span>
+<span class="disallow">Disallow: /</span>
+<span class="agent">User-agent: PerplexityBot</span>
+<span class="disallow">Disallow: /</span>
+<span class="agent">…and 6 more</span></div>
+    </div>
+  </div>
+
+  <div class="feed-panel">
+    <div class="panel-title">Live Violation Feed</div>
+    <div id="violationFeed">
+      <div class="empty-state">No violations logged yet.</div>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <span>goodbot-badbot.com — personal experiment by Olivier Dobberkau</span>
+  <span id="lastUpdate">—</span>
+</footer>
+
+<script>
+document.getElementById('themeToggle').addEventListener('click', () => {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+});
+
+async function loadStats() {
+  try {
+    const res = await fetch('/api/stats');
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    renderStats(data);
+  } catch {
+    // Running standalone (no backend) — show demo data
+    renderStats(getDemoData());
+  }
+}
+
+function getDemoData() {
+  return {
+    total_violations: 0,
+    total_bots_seen: 0,
+    summary: [],
+    recent_violations: []
+  };
+}
+
+function renderStats(data) {
+  document.getElementById('totalViolations').textContent =
+    data.total_violations.toLocaleString();
+  document.getElementById('totalBots').textContent =
+    data.total_bots_seen.toLocaleString();
+
+  const tbody = document.getElementById('botTable');
+  if (data.summary.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No bots observed yet — waiting for crawlers.</td></tr>`;
+  } else {
+    tbody.innerHTML = data.summary.map(row => {
+      const isBad = row.violations > 0;
+      const verdict = isBad
+        ? `<span class="verdict bad">✕ BAD BOT</span>`
+        : `<span class="verdict good">✓ GOOD BOT</span>`;
+      return `<tr>
+        <td><span class="bot-name">${row.bot_name}</span></td>
+        <td><span class="operator">${row.operator}</span></td>
+        <td>${verdict}</td>
+        <td class="count ${isBad ? 'nonzero' : ''}">${row.violations}</td>
+        <td class="count">${row.total_visits}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  const feed = document.getElementById('violationFeed');
+  if (data.recent_violations.length === 0) {
+    feed.innerHTML = `<div class="empty-state">No violations logged yet.</div>`;
+  } else {
+    feed.innerHTML = data.recent_violations.map(v => {
+      const ts = new Date(v.ts + 'Z').toLocaleTimeString('en-GB');
+      return `<div class="feed-item">
+        <div class="feed-time">${ts}</div>
+        <div class="feed-bot">${v.bot_name || 'Unknown'} · ${v.operator || '?'}</div>
+        <div class="feed-path">${v.path}</div>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('lastUpdate').textContent =
+    'Updated ' + new Date().toLocaleTimeString('en-GB');
+}
+
+loadStats();
+setInterval(loadStats, 30000);
+</script>
+</body>
+</html>

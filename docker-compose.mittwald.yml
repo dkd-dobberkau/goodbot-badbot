@@ -1,0 +1,11 @@
+services:
+  web:
+    image: ghcr.io/dkd-dobberkau/goodbot-badbot:latest
+    restart: unless-stopped
+    ports:
+      - "8000"
+    volumes:
+      - crawls:/app/data
+
+volumes:
+  crawls:

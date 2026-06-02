@@ -1,0 +1,14 @@
+data/
+.git/
+.gitignore
+.DS_Store
+.claude/
+.playwright-mcp/
+__pycache__/
+*.pyc
+*.pyo
+README.md
+docker-compose.yml
+docker-compose.mittwald.yml
+.env
+.env.*
