@@ -401,6 +401,18 @@
     color: var(--dim);
   }
 
+  footer a {
+    color: var(--muted);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: color 0.2s ease, border-color 0.2s ease;
+  }
+
+  footer a:hover {
+    color: var(--text);
+    border-bottom-color: var(--muted);
+  }
+
   @media (max-width: 900px) {
     .main-grid { grid-template-columns: 1fr; }
     .stats-row { grid-template-columns: 1fr; }
@@ -498,7 +510,7 @@
 </div>
 
 <footer>
-  <span>goodbot-badbot.com — personal experiment by Olivier Dobberkau</span>
+  <span>goodbot-badbot.com — personal experiment by Olivier Dobberkau · <a href="https://github.com/dkd-dobberkau/goodbot-badbot" target="_blank" rel="noopener noreferrer">source on GitHub</a></span>
   <span id="lastUpdate">—</span>
 </footer>
 
