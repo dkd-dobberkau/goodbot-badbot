@@ -109,7 +109,7 @@ echo "[4/4] Wait for container to settle, then verify"
 HTTP=000
 for i in $(seq 1 12); do
   sleep 3
-  HTTP=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 10 "${HEALTH_URL}" || echo "000")
+  HTTP=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "${HEALTH_URL}" 2>/dev/null || echo "000")
   [[ "${HTTP}" == "200" ]] && break
 done
 if [[ "${HTTP}" != "200" ]]; then
