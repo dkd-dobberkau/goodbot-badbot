@@ -1,0 +1,35 @@
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url(../fonts/rP2Yp2ywxg089UriI5-g4vlH9VoD8CmcqYu28qmR9A.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(../fonts/rP2Yp2ywxg089UriI5-g4vlH9VoD8CmcqYu28qmR9A.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'DM Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url(../fonts/rP2Yp2ywxg089UriI5-g4vlH9VoD8CmcqYu28qmR9A.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url(../fonts/i7dPIFZifjKcF5UAWdDRUEN2Qlq6.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Space Mono';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url(../fonts/i7dMIFZifjKcF5UAWdDRaPpZYFeQGQyU.woff2) format('woff2');
+}

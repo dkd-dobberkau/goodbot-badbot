@@ -104,6 +104,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+app.mount("/vendor", StaticFiles(directory="vendor"), name="vendor")
 
 
 # ── robots.txt ──────────────────────────────────────────────────────────────

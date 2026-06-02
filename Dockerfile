@@ -7,6 +7,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ ./app/
 COPY templates/ ./templates/
+COPY vendor/ ./vendor/
 
 RUN mkdir -p data
 
