@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 DB_PATH = Path("data/crawls.db")
@@ -214,6 +214,24 @@ async def stats():
         "total_violations": total_violations,
         "total_bots_seen": total_bots,
     }
+
+
+# ── Favicon ──────────────────────────────────────────────────────────────────
+
+FAVICON_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
+    '<text x="50%" y="54%" font-size="26" text-anchor="middle" '
+    'dominant-baseline="central">🤖</text></svg>'
+)
+
+
+@app.get("/favicon.ico")
+async def favicon():
+    return Response(
+        content=FAVICON_SVG,
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 # ── Frontend ─────────────────────────────────────────────────────────────────
