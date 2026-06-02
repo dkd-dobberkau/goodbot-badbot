@@ -4,8 +4,9 @@ services:
     restart: unless-stopped
     ports:
       - "8000"
-    volumes:
-      - crawls:/app/data
-
-volumes:
-  crawls:
+    environment:
+      MYSQL_HOST: mysql-scb5w0.pg-s-qgs0m1.db.project.host
+      MYSQL_PORT: "3306"
+      MYSQL_DB: mysql_scb5w0
+      MYSQL_USER: dbu_scb5w0
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}

@@ -49,9 +49,19 @@ docker buildx build \
 
 # ── deploy ───────────────────────────────────────────────────────────────────
 echo "[3/4] Deploy stack to Mittwald and recreate container"
+
+if [[ ! -f .deploy.env ]]; then
+  echo "ERROR: .deploy.env not found. Copy .deploy.env.example and fill in secrets." >&2
+  exit 1
+fi
+
 ENV_FILE="$(mktemp -t deploy.env.XXXX)"
 trap 'rm -f "${ENV_FILE}"' EXIT
-echo "VERSION=${TAG}" > "${ENV_FILE}"
+{
+  echo "VERSION=${TAG}"
+  cat .deploy.env
+} > "${ENV_FILE}"
+
 mw stack deploy --stack-id "${STACK_ID}" -c docker-compose.mittwald.yml --env-file "${ENV_FILE}"
 
 # stack deploy alone does not always force a pull/recreate even with a new

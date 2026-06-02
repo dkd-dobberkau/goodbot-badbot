@@ -3,16 +3,14 @@ goodbot-badbot.com — AI Crawler robots.txt compliance monitor
 """
 
 import hashlib
-import sqlite3
+import os
 from contextlib import asynccontextmanager
-from datetime import datetime
-from pathlib import Path
+from datetime import datetime, timezone
 
+import aiomysql
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
-
-DB_PATH = Path("data/crawls.db")
 
 # Known AI crawlers: (user-agent substring, display name, operator)
 KNOWN_BOTS = {
@@ -49,29 +47,31 @@ HONEYPOT_PATHS = [
 ]
 
 
-def get_db():
-    DB_PATH.parent.mkdir(exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+DB_CONFIG = {
+    "host":     os.getenv("MYSQL_HOST", "127.0.0.1"),
+    "port":     int(os.getenv("MYSQL_PORT", "3306")),
+    "db":       os.getenv("MYSQL_DB", "goodbot"),
+    "user":     os.getenv("MYSQL_USER", "root"),
+    "password": os.getenv("MYSQL_PASSWORD", ""),
+    "charset":  "utf8mb4",
+    "autocommit": True,
+}
 
-
-def init_db():
-    with get_db() as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS visits (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                ts          TEXT NOT NULL,
-                path        TEXT NOT NULL,
-                user_agent  TEXT,
-                bot_key     TEXT,
-                bot_name    TEXT,
-                operator    TEXT,
-                ip_hash     TEXT,
-                is_honeypot INTEGER DEFAULT 0
-            )
-        """)
-        conn.commit()
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS visits (
+    id          BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    ts          DATETIME(6) NOT NULL,
+    path        VARCHAR(512) NOT NULL,
+    user_agent  TEXT,
+    bot_key     VARCHAR(64),
+    bot_name    VARCHAR(64),
+    operator    VARCHAR(64),
+    ip_hash     CHAR(16),
+    is_honeypot TINYINT(1) NOT NULL DEFAULT 0,
+    KEY idx_visits_bot_name (bot_name),
+    KEY idx_visits_is_honeypot_ts (is_honeypot, ts)
+) ENGINE=InnoDB CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
 
 
 def identify_bot(user_agent: str) -> tuple[str | None, str | None, str | None]:
@@ -84,23 +84,30 @@ def identify_bot(user_agent: str) -> tuple[str | None, str | None, str | None]:
     return None, None, None
 
 
-def log_visit(path: str, user_agent: str, ip: str, is_honeypot: bool):
+async def log_visit(pool, path: str, user_agent: str, ip: str, is_honeypot: bool):
     bot_key, bot_name, operator = identify_bot(user_agent)
     ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
-    with get_db() as conn:
-        conn.execute(
-            """INSERT INTO visits (ts, path, user_agent, bot_key, bot_name, operator, ip_hash, is_honeypot)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (datetime.utcnow().isoformat(), path, user_agent,
-             bot_key, bot_name, operator, ip_hash, int(is_honeypot))
-        )
-        conn.commit()
+    ts = datetime.now(timezone.utc).replace(tzinfo=None)
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                """INSERT INTO visits
+                   (ts, path, user_agent, bot_key, bot_name, operator, ip_hash, is_honeypot)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                (ts, path, user_agent, bot_key, bot_name, operator, ip_hash, int(is_honeypot)),
+            )
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    pool = await aiomysql.create_pool(minsize=1, maxsize=5, **DB_CONFIG)
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(SCHEMA)
+    app.state.db_pool = pool
     yield
+    pool.close()
+    await pool.wait_closed()
 
 
 app = FastAPI(lifespan=lifespan)
@@ -152,11 +159,12 @@ User-agent: cohere-ai
 Disallow: /
 """
 
+
 @app.get("/robots.txt", response_class=PlainTextResponse)
 async def robots_txt(request: Request):
     ip = request.client.host
     ua = request.headers.get("user-agent", "")
-    log_visit("/robots.txt", ua, ip, is_honeypot=False)
+    await log_visit(app.state.db_pool, "/robots.txt", ua, ip, is_honeypot=False)
     return ROBOTS_TXT
 
 
@@ -171,7 +179,7 @@ async def robots_txt(request: Request):
 async def honeypot(request: Request, rest: str = ""):
     ip = request.client.host
     ua = request.headers.get("user-agent", "")
-    log_visit(str(request.url.path), ua, ip, is_honeypot=True)
+    await log_visit(app.state.db_pool, str(request.url.path), ua, ip, is_honeypot=True)
     return PlainTextResponse("", status_code=200)
 
 
@@ -179,39 +187,38 @@ async def honeypot(request: Request, rest: str = ""):
 
 @app.get("/api/stats")
 async def stats():
-    with get_db() as conn:
-        # Summary per bot
-        rows = conn.execute("""
-            SELECT bot_name, operator,
-                   COUNT(*) as total_visits,
-                   SUM(is_honeypot) as violations,
-                   MAX(ts) as last_seen
-            FROM visits
-            WHERE bot_name IS NOT NULL
-            GROUP BY bot_name, operator
-            ORDER BY violations DESC, total_visits DESC
-        """).fetchall()
+    async with app.state.db_pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            await cur.execute("""
+                SELECT bot_name, operator,
+                       COUNT(*) AS total_visits,
+                       CAST(SUM(is_honeypot) AS UNSIGNED) AS violations,
+                       MAX(ts) AS last_seen
+                FROM visits
+                WHERE bot_name IS NOT NULL
+                GROUP BY bot_name, operator
+                ORDER BY violations DESC, total_visits DESC
+            """)
+            summary = await cur.fetchall()
 
-        # Recent violations
-        recent = conn.execute("""
-            SELECT ts, path, bot_name, operator, user_agent
-            FROM visits
-            WHERE is_honeypot = 1
-            ORDER BY ts DESC
-            LIMIT 20
-        """).fetchall()
+            await cur.execute("""
+                SELECT ts, path, bot_name, operator, user_agent
+                FROM visits
+                WHERE is_honeypot = 1
+                ORDER BY ts DESC
+                LIMIT 20
+            """)
+            recent = await cur.fetchall()
 
-        total_violations = conn.execute(
-            "SELECT COUNT(*) FROM visits WHERE is_honeypot = 1"
-        ).fetchone()[0]
+            await cur.execute("SELECT COUNT(*) AS c FROM visits WHERE is_honeypot = 1")
+            total_violations = (await cur.fetchone())["c"]
 
-        total_bots = conn.execute(
-            "SELECT COUNT(DISTINCT bot_name) FROM visits WHERE bot_name IS NOT NULL"
-        ).fetchone()[0]
+            await cur.execute("SELECT COUNT(DISTINCT bot_name) AS c FROM visits WHERE bot_name IS NOT NULL")
+            total_bots = (await cur.fetchone())["c"]
 
     return {
-        "summary": [dict(r) for r in rows],
-        "recent_violations": [dict(r) for r in recent],
+        "summary": summary,
+        "recent_violations": recent,
         "total_violations": total_violations,
         "total_bots_seen": total_bots,
     }

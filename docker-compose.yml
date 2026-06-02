@@ -3,6 +3,31 @@ services:
     build: .
     ports:
       - "8000:8000"
-    volumes:
-      - ./data:/app/data
+    environment:
+      MYSQL_HOST: db
+      MYSQL_PORT: "3306"
+      MYSQL_DB: goodbot
+      MYSQL_USER: goodbot
+      MYSQL_PASSWORD: goodbot-local-dev
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
+
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root-local-dev
+      MYSQL_DATABASE: goodbot
+      MYSQL_USER: goodbot
+      MYSQL_PASSWORD: goodbot-local-dev
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot-local-dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mysql_data:
