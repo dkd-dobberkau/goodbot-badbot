@@ -543,6 +543,14 @@ function getDemoData() {
   };
 }
 
+// HTML-escape any string before it goes near innerHTML.
+// v.path comes from the crawler's URL and is fully attacker-controlled;
+// bot_name and operator are server-controlled today but the same helper
+// keeps them safe if that ever changes.
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+}[c]));
+
 function renderStats(data) {
   document.getElementById('totalViolations').textContent =
     data.total_violations.toLocaleString();
@@ -559,8 +567,8 @@ function renderStats(data) {
         ? `<span class="verdict bad">✕ BAD BOT</span>`
         : `<span class="verdict good">✓ GOOD BOT</span>`;
       return `<tr>
-        <td><span class="bot-name">${row.bot_name}</span></td>
-        <td><span class="operator">${row.operator}</span></td>
+        <td><span class="bot-name">${esc(row.bot_name)}</span></td>
+        <td><span class="operator">${esc(row.operator)}</span></td>
         <td>${verdict}</td>
         <td class="count ${isBad ? 'nonzero' : ''}">${row.violations}</td>
         <td class="count">${row.total_visits}</td>
@@ -576,8 +584,8 @@ function renderStats(data) {
       const ts = new Date(v.ts + 'Z').toLocaleTimeString('en-GB');
       return `<div class="feed-item">
         <div class="feed-time">${ts}</div>
-        <div class="feed-bot">${v.bot_name || 'Unknown'} · ${v.operator || '?'}</div>
-        <div class="feed-path">${v.path}</div>
+        <div class="feed-bot">${esc(v.bot_name || 'Unknown')} · ${esc(v.operator || '?')}</div>
+        <div class="feed-path">${esc(v.path)}</div>
       </div>`;
     }).join('');
   }

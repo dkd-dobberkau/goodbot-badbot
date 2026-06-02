@@ -4,6 +4,8 @@ goodbot-badbot.com — AI Crawler robots.txt compliance monitor
 
 import hashlib
 import os
+import time
+from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
@@ -11,6 +13,26 @@ import aiomysql
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
+
+# Hard caps to keep oversized inputs from blowing past column limits or
+# bloating the DB. VARCHAR(512) is the path column; UA TEXT is generous.
+MAX_PATH_LEN = 500
+MAX_UA_LEN = 1024
+
+# Rate-limit rules: (path-prefix, requests-per-minute). First match wins.
+# Honeypots and static-content routes are protected separately because a
+# honeypot flood should not eat the budget for legit /robots.txt or /api/stats
+# traffic from the same IP.
+RATE_LIMIT_RULES = (
+    ("/api/stats",              60),
+    ("/robots.txt",             60),
+    ("/do-not-crawl",           30),
+    ("/private",                30),
+    ("/honeypot",               30),
+    ("/training-data-forbidden", 30),
+    ("/no-ai-allowed",          30),
+    ("/robots-test",            30),
+)
 
 # Known AI crawlers: (user-agent substring, display name, operator)
 KNOWN_BOTS = {
@@ -85,6 +107,8 @@ def identify_bot(user_agent: str) -> tuple[str | None, str | None, str | None]:
 
 
 async def log_visit(pool, path: str, user_agent: str, ip: str, is_honeypot: bool):
+    path = (path or "")[:MAX_PATH_LEN]
+    user_agent = (user_agent or "")[:MAX_UA_LEN]
     bot_key, bot_name, operator = identify_bot(user_agent)
     ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
     ts = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -100,7 +124,7 @@ async def log_visit(pool, path: str, user_agent: str, ip: str, is_honeypot: bool
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    pool = await aiomysql.create_pool(minsize=1, maxsize=5, **DB_CONFIG)
+    pool = await aiomysql.create_pool(minsize=2, maxsize=20, **DB_CONFIG)
     async with pool.acquire() as conn:
         async with conn.cursor() as cur:
             await cur.execute(SCHEMA)
@@ -112,6 +136,36 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.mount("/vendor", StaticFiles(directory="vendor"), name="vendor")
+
+
+# In-memory sliding-window rate limiter, keyed on (client IP, matched prefix).
+# Survives only for the life of one container, which is fine: each new container
+# gets a fresh window, and a bad actor still has to start over.
+_rate_windows: dict[tuple[str, str], deque[float]] = defaultdict(deque)
+
+
+def _rate_check(key: tuple[str, str], limit: int, window_s: int = 60) -> bool:
+    now = time.monotonic()
+    cutoff = now - window_s
+    q = _rate_windows[key]
+    while q and q[0] < cutoff:
+        q.popleft()
+    if len(q) >= limit:
+        return False
+    q.append(now)
+    return True
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    path = request.url.path
+    for prefix, limit in RATE_LIMIT_RULES:
+        if path == prefix or path.startswith(prefix + "/"):
+            ip = (request.client.host if request.client else None) or "unknown"
+            if not _rate_check((ip, prefix), limit):
+                return PlainTextResponse("Too Many Requests", status_code=429)
+            break
+    return await call_next(request)
 
 
 # ── robots.txt ──────────────────────────────────────────────────────────────
@@ -206,7 +260,7 @@ async def honeypot(request: Request, rest: str = ""):
 # ── API: results ─────────────────────────────────────────────────────────────
 
 @app.get("/api/stats")
-async def stats():
+async def stats(request: Request):
     async with app.state.db_pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
             await cur.execute("""
