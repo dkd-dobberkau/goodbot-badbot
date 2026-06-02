@@ -1,6 +1,6 @@
 services:
   web:
-    image: ghcr.io/dkd-dobberkau/goodbot-badbot:latest
+    image: ghcr.io/dkd-dobberkau/goodbot-badbot:${VERSION:-latest}
     restart: unless-stopped
     ports:
       - "8000"

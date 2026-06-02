@@ -48,8 +48,17 @@ docker buildx build \
   --push .
 
 # ── deploy ───────────────────────────────────────────────────────────────────
-echo "[3/4] Deploy stack to Mittwald"
-mw stack deploy --stack-id "${STACK_ID}" -c docker-compose.mittwald.yml
+echo "[3/4] Deploy stack to Mittwald and recreate container"
+ENV_FILE="$(mktemp -t deploy.env.XXXX)"
+trap 'rm -f "${ENV_FILE}"' EXIT
+echo "VERSION=${TAG}" > "${ENV_FILE}"
+mw stack deploy --stack-id "${STACK_ID}" -c docker-compose.mittwald.yml --env-file "${ENV_FILE}"
+
+# stack deploy alone does not always force a pull/recreate even with a new
+# image tag, so we recreate explicitly to make sure the new image is running.
+CID=$(mw container list --project-id "${PROJECT_ID}" --output json \
+  | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["shortId"])')
+mw container recreate "${CID}" --project-id "${PROJECT_ID}" --force
 
 # ── smoke test ───────────────────────────────────────────────────────────────
 echo "[4/4] Wait for container to settle, then verify"
