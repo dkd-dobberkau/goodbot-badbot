@@ -41,4 +41,6 @@ All are listed in `robots.txt` as `Disallow`. Any hit = violation.
 
 ## Data
 
-SQLite at `data/crawls.db`. IP addresses are SHA-256 hashed (first 16 chars).
+MySQL 8.4 (in production: managed Mittwald service; for local dev: a `mysql:8.4`
+container in `docker-compose.yml`). Connection details are read from the
+`MYSQL_*` env vars. IP addresses are SHA-256 hashed (first 16 chars).

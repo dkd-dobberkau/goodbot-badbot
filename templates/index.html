@@ -477,25 +477,15 @@
 
     <div class="robots-box">
       <div class="robots-header">robots.txt — honeypot config</div>
-      <div class="robots-content"><span class="comment"># All bots: honeypot paths blocked</span>
+      <div class="robots-content"><span class="comment"># Only honeypot paths are blocked. The rest is open,</span>
+<span class="comment"># so compliance with Disallow rules can be measured.</span>
 <span class="agent">User-agent: *</span>
 <span class="disallow">Disallow: /do-not-crawl/</span>
 <span class="disallow">Disallow: /private/</span>
 <span class="disallow">Disallow: /honeypot/</span>
 <span class="disallow">Disallow: /training-data-forbidden/</span>
 <span class="disallow">Disallow: /no-ai-allowed/</span>
-<span class="disallow">Disallow: /robots-test/</span>
-
-<span class="comment"># Known AI crawlers: fully blocked</span>
-<span class="agent">User-agent: GPTBot</span>
-<span class="disallow">Disallow: /</span>
-<span class="agent">User-agent: ClaudeBot</span>
-<span class="disallow">Disallow: /</span>
-<span class="agent">User-agent: CCBot</span>
-<span class="disallow">Disallow: /</span>
-<span class="agent">User-agent: PerplexityBot</span>
-<span class="disallow">Disallow: /</span>
-<span class="agent">…and 6 more</span></div>
+<span class="disallow">Disallow: /robots-test/</span></div>
     </div>
   </div>
 

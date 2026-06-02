@@ -116,47 +116,20 @@ app.mount("/vendor", StaticFiles(directory="vendor"), name="vendor")
 
 # ── robots.txt ──────────────────────────────────────────────────────────────
 
-ROBOTS_TXT = """User-agent: *
+ROBOTS_TXT = """# This site monitors whether crawlers respect robots.txt.
+# The paths listed below as Disallow are honeypots.
+# Any request to them is logged as a violation, regardless of
+# user-agent. The rest of the site is open to all bots so that
+# compliance can actually be measured.
+# Results are published at https://goodbot-badbot.com
+
+User-agent: *
 Disallow: /do-not-crawl/
 Disallow: /private/
 Disallow: /honeypot/
 Disallow: /training-data-forbidden/
 Disallow: /no-ai-allowed/
 Disallow: /robots-test/
-
-# This site monitors whether AI crawlers respect robots.txt.
-# Every request to the paths above is logged as a violation.
-# Results are published at https://goodbot-badbot.com/results
-
-User-agent: GPTBot
-Disallow: /
-
-User-agent: ChatGPT-User
-Disallow: /
-
-User-agent: OAI-SearchBot
-Disallow: /
-
-User-agent: CCBot
-Disallow: /
-
-User-agent: anthropic-ai
-Disallow: /
-
-User-agent: ClaudeBot
-Disallow: /
-
-User-agent: Google-Extended
-Disallow: /
-
-User-agent: Bytespider
-Disallow: /
-
-User-agent: PerplexityBot
-Disallow: /
-
-User-agent: cohere-ai
-Disallow: /
 """
 
 
