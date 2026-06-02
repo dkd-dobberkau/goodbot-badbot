@@ -1,30 +1,15 @@
 # goodbot-badbot
 
-AI crawler robots.txt compliance monitor.
+> Live at **<https://goodbot-badbot.com>**
 
-Honeypot paths are blocked via `robots.txt`. Every crawler that visits them
-anyway gets logged. Results are shown on the public dashboard.
+A small public experiment that measures whether AI crawlers actually respect
+`robots.txt`. The site declares six honeypot paths as `Disallow`. Any request
+to one of them — by any user-agent — is logged as a violation and shown on
+the public dashboard in real time.
 
-## Quick start
-
-```bash
-# Local dev
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-
-# Production
-docker compose up -d
-```
-
-Dashboard: http://localhost:8000  
-API stats: http://localhost:8000/api/stats  
-robots.txt: http://localhost:8000/robots.txt
-
-## Monitored bots
-
-GPTBot, ChatGPT-User, OAI-SearchBot (OpenAI) · ClaudeBot, anthropic-ai (Anthropic)
-CCBot (Common Crawl) · Bytespider (ByteDance) · PerplexityBot (Perplexity)
-Google-Extended, GoogleOther · Applebot-Extended · Diffbot · cohere-ai · YouBot
+The rest of the site is open to all bots, so compliance with a single
+`Disallow` rule can be measured cleanly: a respectful crawler hits the
+homepage and stops; a non-respectful one keeps going into the honeypots.
 
 ## Honeypot paths
 
@@ -37,10 +22,49 @@ Google-Extended, GoogleOther · Applebot-Extended · Diffbot · cohere-ai · You
 /robots-test/
 ```
 
-All are listed in `robots.txt` as `Disallow`. Any hit = violation.
+All listed in [`/robots.txt`](https://goodbot-badbot.com/robots.txt) as
+`Disallow`. Any hit on these paths = violation.
 
-## Data
+## Identified bots
 
-MySQL 8.4 (in production: managed Mittwald service; for local dev: a `mysql:8.4`
-container in `docker-compose.yml`). Connection details are read from the
-`MYSQL_*` env vars. IP addresses are SHA-256 hashed (first 16 chars).
+Visits are tagged with the operator when a known user-agent substring is
+recognised (GPTBot, ClaudeBot, CCBot, Bytespider, PerplexityBot,
+Google-Extended, Applebot-Extended, Diffbot, cohere-ai, YouBot and others).
+Unknown user-agents are still logged, just without attribution.
+
+## Stack
+
+- FastAPI (Python 3.12, async)
+- aiomysql against MySQL 8.4
+- Vanilla HTML / CSS / no JS framework
+- Docker for both local dev and production
+- Self-hosted Google Fonts, no external CDN at runtime
+
+## Local dev
+
+```bash
+docker compose up -d --build
+open http://localhost:8000
+```
+
+This brings up the FastAPI app and a `mysql:8.4` service with a healthcheck;
+the app waits for the DB and creates its schema on startup. Connection
+settings come from the `MYSQL_*` env vars in `docker-compose.yml`.
+
+## API
+
+```
+GET /              # dashboard
+GET /robots.txt    # the honeypot rules
+GET /api/stats     # JSON: per-bot summary + recent violations
+GET /favicon.ico   # 🤖
+```
+
+## Privacy
+
+IP addresses are SHA-256 hashed and truncated to the first 16 hex chars
+before storage. The raw IP never touches disk.
+
+## License
+
+MIT
