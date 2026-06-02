@@ -141,6 +141,53 @@ async def robots_txt(request: Request):
     return ROBOTS_TXT
 
 
+# ── llms.txt (llmstxt.org standard) ──────────────────────────────────────────
+
+LLMS_TXT = """# goodbot-badbot
+
+> Live monitor of AI crawler robots.txt compliance. Six honeypot paths are
+> listed as Disallow in /robots.txt. Any crawler that visits one of them is
+> logged as a violation, regardless of user-agent. Results are published in
+> real time on the public dashboard.
+
+## How it works
+
+The site is open to all crawlers. Only six honeypot paths are blocked via
+the global `User-agent: *` Disallow rule. A compliant crawler hits the
+homepage and stops at the boundary; a non-compliant crawler keeps going and
+trips a honeypot, where its visit is recorded.
+
+## Live data
+
+- [Public dashboard](https://goodbot-badbot.com/): per-bot scoreboard and live violation feed
+- [JSON stats](https://goodbot-badbot.com/api/stats): machine-readable summary
+- [robots.txt](https://goodbot-badbot.com/robots.txt): the honeypot rules
+
+## Honeypot paths
+
+- `/do-not-crawl/`
+- `/private/`
+- `/honeypot/`
+- `/training-data-forbidden/`
+- `/no-ai-allowed/`
+- `/robots-test/`
+
+## Source code
+
+- [GitHub repository](https://github.com/dkd-dobberkau/goodbot-badbot): MIT-licensed, FastAPI + MySQL
+
+## Privacy
+
+Logged IPs are SHA-256 hashed and truncated to 16 hex chars before storage.
+The raw IP is never written to disk.
+"""
+
+
+@app.get("/llms.txt")
+async def llms_txt():
+    return Response(content=LLMS_TXT, media_type="text/markdown; charset=utf-8")
+
+
 # ── Honeypot endpoints ───────────────────────────────────────────────────────
 
 @app.get("/do-not-crawl/{rest:path}")
