@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 import aiomysql
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 # Hard caps to keep oversized inputs from blowing past column limits or
@@ -27,6 +27,7 @@ RATE_LIMIT_RULES = (
     ("/api/stats",              60),
     ("/robots.txt",             60),
     ("/sitemap.xml",            60),
+    ("/.well-known/http-message-signatures-directory", 60),
     ("/do-not-crawl",           30),
     ("/private",                30),
     ("/honeypot",               30),
@@ -257,6 +258,36 @@ async def sitemap_xml(request: Request):
     ua = request.headers.get("user-agent", "")
     await log_visit(app.state.db_pool, "/sitemap.xml", ua, ip, is_honeypot=False)
     return Response(content=SITEMAP_XML, media_type="application/xml")
+
+
+# ── Web Bot Auth: JWKS for outbound identity ────────────────────────────────
+
+# Ed25519 public key, published per the IETF WebBotAuth WG draft so receiving
+# sites could verify any future signed requests originating from this domain.
+# The matching private key was generated offline and discarded; we don't
+# emit signed requests today. To start signing later, generate a new keypair
+# and replace kid + x — consumers refetch on cache miss.
+WEB_BOT_AUTH_JWKS = {
+    "keys": [
+        {
+            "kty": "OKP",
+            "crv": "Ed25519",
+            "kid": "goodbot-badbot-2026-06-03",
+            "x": "wJJd5OF5MmtXEkauhmjaLIgNSkX_CQlBd7g-pPSyJ1s",
+            "use": "sig",
+            "alg": "EdDSA",
+        }
+    ]
+}
+
+
+@app.get("/.well-known/http-message-signatures-directory")
+async def web_bot_auth_directory():
+    return JSONResponse(
+        content=WEB_BOT_AUTH_JWKS,
+        media_type="application/jwk-set+json",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
 
 
 # ── llms.txt (llmstxt.org standard) ──────────────────────────────────────────
