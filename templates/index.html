@@ -473,6 +473,32 @@
     border-bottom-color: var(--muted);
   }
 
+  /* SIGNATURE + LINK-SOURCE BADGES */
+  .sig-badge, .link-badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    padding: 0.12rem 0.4rem;
+    border-radius: 2px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border: 1px solid var(--border);
+  }
+  .sig-badge { margin-left: 0.45rem; }
+  .link-badge { margin-right: 0.45rem; }
+  .sig-badge.verified, .link-badge.via-guess { color: var(--green); border-color: var(--verdict-good-border); background: var(--verdict-good-bg); }
+  .sig-badge.failed,   .link-badge.via-link  { color: var(--red);   border-color: var(--verdict-bad-border);  background: var(--verdict-bad-bg); }
+  .sig-badge.unsigned                        { color: var(--dim); }
+
+  .signed-cell {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--muted);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .signed-cell.has-verified { color: var(--green); }
+
   @media (max-width: 900px) {
     .main-grid { grid-template-columns: 1fr; }
     .stats-row { grid-template-columns: 1fr; }
@@ -524,8 +550,8 @@
     <div class="stat-value yellow" id="totalBots">—</div>
   </div>
   <div class="stat-box">
-    <div class="stat-label">Honeypot Paths</div>
-    <div class="stat-value green">6</div>
+    <div class="stat-label">Verified (Web Bot Auth)</div>
+    <div class="stat-value green" id="totalVerified">—</div>
   </div>
 </div>
 
@@ -538,12 +564,13 @@
           <th>Bot</th>
           <th>Operator</th>
           <th>Verdict</th>
+          <th style="text-align:right">Signed</th>
           <th style="text-align:right">Violations</th>
-          <th style="text-align:right">Total Visits</th>
+          <th style="text-align:right">Visits</th>
         </tr>
       </thead>
       <tbody id="botTable">
-        <tr><td colspan="5" class="empty-state">Loading…</td></tr>
+        <tr><td colspan="6" class="empty-state">Loading…</td></tr>
       </tbody>
     </table>
 
@@ -621,6 +648,7 @@ function getDemoData() {
   return {
     total_violations: 0,
     total_bots_seen: 0,
+    total_verified: 0,
     summary: [],
     recent_violations: []
   };
@@ -639,22 +667,30 @@ function renderStats(data) {
     data.total_violations.toLocaleString();
   document.getElementById('totalBots').textContent =
     data.total_bots_seen.toLocaleString();
+  document.getElementById('totalVerified').textContent =
+    (data.total_verified || 0).toLocaleString();
 
   const tbody = document.getElementById('botTable');
   if (data.summary.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" class="empty-state">No bots observed yet — waiting for crawlers.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No bots observed yet — waiting for crawlers.</td></tr>`;
   } else {
     tbody.innerHTML = data.summary.map(row => {
       const isBad = row.violations > 0;
       const verdict = isBad
         ? `<span class="verdict bad">✕ BAD BOT</span>`
         : `<span class="verdict good">✓ GOOD BOT</span>`;
+      const verified = Number(row.verified_visits) || 0;
+      const total = Number(row.total_visits) || 0;
+      const signedCell = verified > 0
+        ? `<td class="signed-cell has-verified">${verified}/${total}</td>`
+        : `<td class="signed-cell">—</td>`;
       return `<tr>
         <td><span class="bot-name">${esc(row.bot_name)}</span></td>
         <td><span class="operator">${esc(row.operator)}</span></td>
         <td>${verdict}</td>
+        ${signedCell}
         <td class="count ${isBad ? 'nonzero' : ''}">${row.violations}</td>
-        <td class="count">${row.total_visits}</td>
+        <td class="count">${total}</td>
       </tr>`;
     }).join('');
   }
@@ -665,10 +701,17 @@ function renderStats(data) {
   } else {
     feed.innerHTML = data.recent_violations.map(v => {
       const ts = new Date(v.ts + 'Z').toLocaleTimeString('en-GB');
+      const viaLink = String(v.path || '').includes('/visible-trap');
+      const linkBadge = viaLink
+        ? `<span class="link-badge via-link">via link</span>`
+        : `<span class="link-badge via-guess">via guess</span>`;
+      let sigBadge = '';
+      if (v.signature_status === 'verified') sigBadge = `<span class="sig-badge verified">signed ✓</span>`;
+      else if (v.signature_status === 'failed') sigBadge = `<span class="sig-badge failed">sig fail</span>`;
       return `<div class="feed-item">
         <div class="feed-time">${ts}</div>
-        <div class="feed-bot">${esc(v.bot_name || 'Unknown')} · ${esc(v.operator || '?')}</div>
-        <div class="feed-path">${esc(v.path)}</div>
+        <div class="feed-bot">${esc(v.bot_name || 'Unknown')} · ${esc(v.operator || '?')}${sigBadge}</div>
+        <div class="feed-path">${linkBadge}${esc(v.path)}</div>
       </div>`;
     }).join('');
   }

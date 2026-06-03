@@ -3,6 +3,7 @@ goodbot-badbot.com — AI Crawler robots.txt compliance monitor
 """
 
 import asyncio
+import base64
 import hashlib
 import os
 import time
@@ -11,9 +12,17 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
 import aiomysql
+import http_sfv
+import httpx
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
+from http_message_signatures import (
+    HTTPMessageVerifier,
+    HTTPSignatureKeyResolver,
+    algorithms,
+)
 
 # Hard caps to keep oversized inputs from blowing past column limits or
 # bloating the DB. VARCHAR(512) is the path column; UA TEXT is generous.
@@ -127,19 +136,36 @@ DB_CONFIG = {
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS visits (
-    id          BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-    ts          DATETIME(6) NOT NULL,
-    path        VARCHAR(512) NOT NULL,
-    user_agent  TEXT,
-    bot_key     VARCHAR(64),
-    bot_name    VARCHAR(64),
-    operator    VARCHAR(64),
-    ip_hash     CHAR(16),
-    is_honeypot TINYINT(1) NOT NULL DEFAULT 0,
+    id               BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
+    ts               DATETIME(6) NOT NULL,
+    path             VARCHAR(512) NOT NULL,
+    user_agent       TEXT,
+    bot_key          VARCHAR(64),
+    bot_name         VARCHAR(64),
+    operator         VARCHAR(64),
+    ip_hash          CHAR(16),
+    is_honeypot      TINYINT(1) NOT NULL DEFAULT 0,
+    signature_status VARCHAR(16) NULL,
     KEY idx_visits_bot_name (bot_name),
     KEY idx_visits_is_honeypot_ts (is_honeypot, ts)
 ) ENGINE=InnoDB CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 """
+
+# MySQL has no ADD COLUMN IF NOT EXISTS, so probe information_schema before
+# attempting the ALTER. This is the idempotent way to evolve the schema for
+# DBs that pre-date the column (the production DB volume persists across
+# deploys; fresh dev DBs get the column via SCHEMA above).
+async def _ensure_signature_status_column(cur):
+    await cur.execute(
+        """
+        SELECT COUNT(*) FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'visits'
+          AND COLUMN_NAME = 'signature_status'
+        """
+    )
+    if (await cur.fetchone())[0] == 0:
+        await cur.execute("ALTER TABLE visits ADD COLUMN signature_status VARCHAR(16) NULL")
 
 
 def identify_bot(user_agent: str) -> tuple[str | None, str | None, str | None]:
@@ -152,7 +178,14 @@ def identify_bot(user_agent: str) -> tuple[str | None, str | None, str | None]:
     return None, None, None
 
 
-async def log_visit(pool, path: str, user_agent: str, ip: str, is_honeypot: bool):
+async def log_visit(
+    pool,
+    path: str,
+    user_agent: str,
+    ip: str,
+    is_honeypot: bool,
+    signature_status: str | None = None,
+):
     path = (path or "")[:MAX_PATH_LEN]
     user_agent = (user_agent or "")[:MAX_UA_LEN]
     bot_key, bot_name, operator = identify_bot(user_agent)
@@ -162,9 +195,9 @@ async def log_visit(pool, path: str, user_agent: str, ip: str, is_honeypot: bool
         async with conn.cursor() as cur:
             await cur.execute(
                 """INSERT INTO visits
-                   (ts, path, user_agent, bot_key, bot_name, operator, ip_hash, is_honeypot)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
-                (ts, path, user_agent, bot_key, bot_name, operator, ip_hash, int(is_honeypot)),
+                   (ts, path, user_agent, bot_key, bot_name, operator, ip_hash, is_honeypot, signature_status)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                (ts, path, user_agent, bot_key, bot_name, operator, ip_hash, int(is_honeypot), signature_status),
             )
 
 
@@ -192,6 +225,7 @@ async def lifespan(app: FastAPI):
     async with pool.acquire() as conn:
         async with conn.cursor() as cur:
             await cur.execute(SCHEMA)
+            await _ensure_signature_status_column(cur)
     app.state.db_pool = pool
     yield
     pool.close()
@@ -218,6 +252,114 @@ def _rate_check(key: tuple[str, str], limit: int, window_s: int = 60) -> bool:
         return False
     q.append(now)
     return True
+
+
+# ── Web Bot Auth: incoming signature verification ───────────────────────────
+
+# Per-URL JWKS cache. Web Bot Auth says caches should be short-lived because
+# operators rotate keys; 1 h is the conservative default.
+_jwks_cache: dict[str, tuple[float, dict]] = {}
+_jwks_lock = asyncio.Lock()
+JWKS_CACHE_TTL_S = 3600
+JWKS_FETCH_TIMEOUT_S = 3.0
+
+
+async def _get_jwks(url: str) -> dict | None:
+    now = time.monotonic()
+    entry = _jwks_cache.get(url)
+    if entry and (now - entry[0]) < JWKS_CACHE_TTL_S:
+        return entry[1]
+    async with _jwks_lock:
+        entry = _jwks_cache.get(url)
+        if entry and (time.monotonic() - entry[0]) < JWKS_CACHE_TTL_S:
+            return entry[1]
+        try:
+            async with httpx.AsyncClient(timeout=JWKS_FETCH_TIMEOUT_S) as client:
+                resp = await client.get(url)
+                resp.raise_for_status()
+                jwks = resp.json()
+        except Exception:
+            return None
+        _jwks_cache[url] = (time.monotonic(), jwks)
+        return jwks
+
+
+class _JWKSKeyResolver(HTTPSignatureKeyResolver):
+    """Resolves a key id to an Ed25519 public key from a fetched JWKS set."""
+
+    def __init__(self, jwks: dict):
+        self.keys: dict[str, Ed25519PublicKey] = {}
+        for jwk in (jwks or {}).get("keys", []):
+            if jwk.get("kty") != "OKP" or jwk.get("crv") != "Ed25519":
+                continue
+            kid = jwk.get("kid")
+            x_b64 = jwk.get("x") or ""
+            if not kid or not x_b64:
+                continue
+            padded = x_b64 + "=" * (-len(x_b64) % 4)
+            try:
+                x_bytes = base64.urlsafe_b64decode(padded)
+                self.keys[kid] = Ed25519PublicKey.from_public_bytes(x_bytes)
+            except Exception:
+                continue
+
+    def resolve_public_key(self, key_id: str):
+        if key_id not in self.keys:
+            raise KeyError(f"key id {key_id!r} not in JWKS")
+        return self.keys[key_id]
+
+
+def _parse_signature_agent(raw: str) -> str | None:
+    # Signature-Agent is an sf-string per the Web Bot Auth draft.
+    try:
+        item = http_sfv.Item()
+        item.parse(raw.encode())
+        value = item.value
+        return value if isinstance(value, str) else None
+    except Exception:
+        return None
+
+
+async def _verify_request_signature(request: Request) -> str | None:
+    # Returns 'verified' | 'failed' | None (unsigned). Cheap on unsigned.
+    headers = request.headers
+    if "signature" not in headers or "signature-input" not in headers:
+        return None
+    agent_raw = headers.get("signature-agent")
+    if not agent_raw:
+        return "failed"
+    agent_url = _parse_signature_agent(agent_raw)
+    if not agent_url:
+        return "failed"
+    jwks = await _get_jwks(agent_url)
+    if not jwks:
+        return "failed"
+    resolver = _JWKSKeyResolver(jwks)
+    if not resolver.keys:
+        return "failed"
+    verifier = HTTPMessageVerifier(
+        signature_algorithm=algorithms.ED25519,
+        key_resolver=resolver,
+    )
+    httpx_req = httpx.Request(
+        method=request.method,
+        url=str(request.url),
+        headers=dict(headers),
+    )
+    try:
+        verifier.verify(httpx_req)
+        return "verified"
+    except Exception:
+        return "failed"
+
+
+# Declared before rate_limit_middleware so rate_limit wraps it from outside —
+# a 429 short-circuits BEFORE we spend a possible JWKS fetch on a request the
+# server is about to reject anyway.
+@app.middleware("http")
+async def signature_verification_middleware(request: Request, call_next):
+    request.state.signature_status = await _verify_request_signature(request)
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -294,7 +436,10 @@ async def robots_txt(request: Request):
     ip = request.client.host
     ua = request.headers.get("user-agent", "")
     if _should_log_meta_visit("/robots.txt", ua):
-        await log_visit(app.state.db_pool, "/robots.txt", ua, ip, is_honeypot=False)
+        await log_visit(
+            app.state.db_pool, "/robots.txt", ua, ip, is_honeypot=False,
+            signature_status=request.state.signature_status,
+        )
     return ROBOTS_TXT
 
 
@@ -319,7 +464,10 @@ async def sitemap_xml(request: Request):
     ip = request.client.host
     ua = request.headers.get("user-agent", "")
     if _should_log_meta_visit("/sitemap.xml", ua):
-        await log_visit(app.state.db_pool, "/sitemap.xml", ua, ip, is_honeypot=False)
+        await log_visit(
+            app.state.db_pool, "/sitemap.xml", ua, ip, is_honeypot=False,
+            signature_status=request.state.signature_status,
+        )
     return Response(content=SITEMAP_XML, media_type="application/xml")
 
 
@@ -411,7 +559,10 @@ async def llms_txt():
 async def honeypot(request: Request, rest: str = ""):
     ip = request.client.host
     ua = request.headers.get("user-agent", "")
-    await log_visit(app.state.db_pool, str(request.url.path), ua, ip, is_honeypot=True)
+    await log_visit(
+        app.state.db_pool, str(request.url.path), ua, ip, is_honeypot=True,
+        signature_status=request.state.signature_status,
+    )
     return PlainTextResponse("", status_code=200)
 
 
@@ -434,6 +585,8 @@ async def _compute_stats() -> dict:
                 SELECT bot_name, operator,
                        COUNT(*) AS total_visits,
                        CAST(SUM(is_honeypot) AS UNSIGNED) AS violations,
+                       CAST(SUM(signature_status = 'verified') AS UNSIGNED) AS verified_visits,
+                       CAST(SUM(signature_status = 'failed') AS UNSIGNED) AS failed_sigs,
                        MAX(ts) AS last_seen
                 FROM visits
                 WHERE bot_name IS NOT NULL
@@ -443,7 +596,7 @@ async def _compute_stats() -> dict:
             summary = await cur.fetchall()
 
             await cur.execute("""
-                SELECT ts, path, bot_name, operator, user_agent
+                SELECT ts, path, bot_name, operator, user_agent, signature_status
                 FROM visits
                 WHERE is_honeypot = 1
                 ORDER BY ts DESC
@@ -457,11 +610,15 @@ async def _compute_stats() -> dict:
             await cur.execute("SELECT COUNT(DISTINCT bot_name) AS c FROM visits WHERE bot_name IS NOT NULL")
             total_bots = (await cur.fetchone())["c"]
 
+            await cur.execute("SELECT COUNT(*) AS c FROM visits WHERE signature_status = 'verified'")
+            total_verified = (await cur.fetchone())["c"]
+
     return {
         "summary": summary,
         "recent_violations": recent,
         "total_violations": total_violations,
         "total_bots_seen": total_bots,
+        "total_verified": total_verified,
     }
 
 
