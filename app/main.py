@@ -485,6 +485,19 @@ async def stats(response: Response):
     return await _get_stats_cached()
 
 
+# Build-time SHA baked into the image via the Dockerfile ARG. deploy.sh
+# polls this after a stack-deploy to confirm the new code is actually
+# serving requests — Mittwald's reported deployedState.image is unreliable
+# (it can report the new tag while the container still runs old code).
+BUILD_VERSION = os.getenv("BUILD_VERSION", "unknown")
+
+
+@app.get("/api/version")
+async def version(response: Response):
+    response.headers["Cache-Control"] = "no-store"
+    return {"version": BUILD_VERSION}
+
+
 # ── Favicon ──────────────────────────────────────────────────────────────────
 
 FAVICON_SVG = (

@@ -11,7 +11,9 @@
 set -euo pipefail
 
 IMAGE="ghcr.io/dkd-dobberkau/goodbot-badbot"
-HEALTH_URL="https://goodbot-badbot.com/api/stats"
+BASE_URL="https://goodbot-badbot.com"
+HEALTH_URL="${BASE_URL}/api/stats"
+VERSION_URL="${BASE_URL}/api/version"
 
 # Mittwald stack/project identifiers come from .deploy.env so the public
 # repo doesn't ship internal IDs. Sourced before pre-flight so missing
@@ -55,6 +57,7 @@ gh auth token | docker login ghcr.io -u dkd-dobberkau --password-stdin >/dev/nul
 echo "[2/4] Build linux/amd64 and push (${TAG} + latest)"
 docker buildx build \
   --platform linux/amd64 \
+  --build-arg "GIT_SHA=${TAG}" \
   -t "${IMAGE}:${TAG}" \
   -t "${IMAGE}:latest" \
   --push .
@@ -71,27 +74,35 @@ trap 'rm -f "${ENV_FILE}"' EXIT
 
 mw stack deploy --stack-id "${STACK_ID}" -c docker-compose.mittwald.yml --env-file "${ENV_FILE}"
 
-# When the compose's image tag actually changes (which is our normal flow
-# because the tag is the git short SHA), Mittwald already restarts the
-# service as part of stack deploy. We just need to wait for that to settle.
-# Only force a manual recreate if the stack didn't pick up the change on its
-# own — e.g. when redeploying the same TAG.
-TARGET_IMAGE="${IMAGE}:${TAG}"
-echo "  waiting for ${TARGET_IMAGE} to become live..."
-STATE=""
-for i in $(seq 1 60); do
-  STATE=$(mw container list --project-id "${PROJECT_ID}" --output json 2>/dev/null \
-    | python3 -c "
-import sys, json
-c = json.load(sys.stdin)[0]
-print(c['deployedState']['image'], c['status'])
-" 2>/dev/null || echo "")
-  [[ "${STATE}" == "${TARGET_IMAGE} running" ]] && break
-  sleep 2
-done
+# Probe the running code via /api/version rather than Mittwald's
+# deployedState.image — the latter has lied to us multiple times,
+# reporting the new tag while the container still ran old code. Source
+# of truth is what the process actually serves.
+probe_live_version() {
+  curl -fsS --max-time 5 "${VERSION_URL}" 2>/dev/null \
+    | python3 -c 'import sys, json
+try: print(json.load(sys.stdin).get("version", ""))
+except Exception: print("")' 2>/dev/null \
+    || true
+}
 
-if [[ "${STATE}" != "${TARGET_IMAGE} running" ]]; then
-  echo "  stack deploy did not switch to ${TARGET_IMAGE}; forcing recreate"
+wait_for_version() {
+  local expected="$1" max_iter="$2" current=""
+  for ((i = 0; i < max_iter; i++)); do
+    current="$(probe_live_version)"
+    if [[ "${current}" == "${expected}" ]]; then
+      printf '%s' "${current}"
+      return 0
+    fi
+    sleep 2
+  done
+  printf '%s' "${current}"
+  return 1
+}
+
+echo "  waiting for /api/version to report ${TAG}..."
+LIVE_VERSION="$(wait_for_version "${TAG}" 30)" || {
+  echo "  /api/version reports '${LIVE_VERSION:-<empty>}', expected '${TAG}'; forcing recreate"
   CID=$(mw container list --project-id "${PROJECT_ID}" --output json \
     | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["shortId"])')
   for attempt in 1 2 3; do
@@ -102,7 +113,13 @@ if [[ "${STATE}" != "${TARGET_IMAGE} running" ]]; then
     echo "  recreate attempt ${attempt} failed, retrying in $((attempt * 5))s..."
     sleep $((attempt * 5))
   done
-fi
+  echo "  re-probing /api/version after recreate..."
+  LIVE_VERSION="$(wait_for_version "${TAG}" 30)" || {
+    echo "ERROR: /api/version still reports '${LIVE_VERSION:-<empty>}' after forced recreate" >&2
+    exit 1
+  }
+}
+echo "  live version: ${LIVE_VERSION}"
 
 # ── smoke test ───────────────────────────────────────────────────────────────
 echo "[4/4] Wait for container to settle, then verify"

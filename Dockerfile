@@ -13,6 +13,10 @@ COPY --chown=appuser:appuser vendor/ ./vendor/
 
 RUN mkdir -p data && chown appuser:appuser data
 
+# Late ARG so changing the SHA doesn't invalidate the pip-install layer.
+ARG GIT_SHA=unknown
+ENV BUILD_VERSION=$GIT_SHA
+
 USER appuser
 
 CMD ["uvicorn", "app.main:app", \
