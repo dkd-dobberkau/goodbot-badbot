@@ -2,6 +2,7 @@
 goodbot-badbot.com — AI Crawler robots.txt compliance monitor
 """
 
+import asyncio
 import hashlib
 import os
 import time
@@ -167,6 +168,24 @@ async def log_visit(pool, path: str, user_agent: str, ip: str, is_honeypot: bool
             )
 
 
+# Dedup meta-visits (robots.txt, sitemap.xml) per (path, bot-identity) within
+# a TTL window so an HN-hug doesn't fill the table with identical rows. Honey-
+# pot hits stay untouched — every violation is independent signal.
+_visit_dedup: dict[tuple[str, str], float] = {}
+META_DEDUP_TTL_S = 600
+
+
+def _should_log_meta_visit(path: str, user_agent: str) -> bool:
+    bot_key, _, _ = identify_bot(user_agent)
+    identity = bot_key or hashlib.sha256((user_agent or "").encode()).hexdigest()[:16]
+    now = time.monotonic()
+    last = _visit_dedup.get((path, identity))
+    if last is not None and (now - last) < META_DEDUP_TTL_S:
+        return False
+    _visit_dedup[(path, identity)] = now
+    return True
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     pool = await aiomysql.create_pool(minsize=2, maxsize=20, **DB_CONFIG)
@@ -274,7 +293,8 @@ Sitemap: {SITE_BASE_URL}/sitemap.xml
 async def robots_txt(request: Request):
     ip = request.client.host
     ua = request.headers.get("user-agent", "")
-    await log_visit(app.state.db_pool, "/robots.txt", ua, ip, is_honeypot=False)
+    if _should_log_meta_visit("/robots.txt", ua):
+        await log_visit(app.state.db_pool, "/robots.txt", ua, ip, is_honeypot=False)
     return ROBOTS_TXT
 
 
@@ -298,7 +318,8 @@ SITEMAP_XML = f"""<?xml version="1.0" encoding="UTF-8"?>
 async def sitemap_xml(request: Request):
     ip = request.client.host
     ua = request.headers.get("user-agent", "")
-    await log_visit(app.state.db_pool, "/sitemap.xml", ua, ip, is_honeypot=False)
+    if _should_log_meta_visit("/sitemap.xml", ua):
+        await log_visit(app.state.db_pool, "/sitemap.xml", ua, ip, is_honeypot=False)
     return Response(content=SITEMAP_XML, media_type="application/xml")
 
 
@@ -396,8 +417,17 @@ async def honeypot(request: Request, rest: str = ""):
 
 # ── API: results ─────────────────────────────────────────────────────────────
 
-@app.get("/api/stats")
-async def stats(request: Request):
+# Single-flight TTL cache: under HN-spike concurrency, the first request
+# computes and any others arriving within the TTL share the result instead
+# of fanning out N copies of the same four-query bundle to MySQL. TTL is
+# shorter than the dashboard's 30s poll cadence, so a single client never
+# sees an artefact of the cache; the win is purely at concurrency.
+STATS_TTL_S = 5
+_stats_cache: dict = {"ts": 0.0, "data": None}
+_stats_lock = asyncio.Lock()
+
+
+async def _compute_stats() -> dict:
     async with app.state.db_pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
             await cur.execute("""
@@ -433,6 +463,26 @@ async def stats(request: Request):
         "total_violations": total_violations,
         "total_bots_seen": total_bots,
     }
+
+
+async def _get_stats_cached() -> dict:
+    now = time.monotonic()
+    if _stats_cache["data"] is not None and (now - _stats_cache["ts"]) < STATS_TTL_S:
+        return _stats_cache["data"]
+    async with _stats_lock:
+        now = time.monotonic()
+        if _stats_cache["data"] is not None and (now - _stats_cache["ts"]) < STATS_TTL_S:
+            return _stats_cache["data"]
+        data = await _compute_stats()
+        _stats_cache["ts"] = time.monotonic()
+        _stats_cache["data"] = data
+        return data
+
+
+@app.get("/api/stats")
+async def stats(response: Response):
+    response.headers["Cache-Control"] = f"public, max-age={STATS_TTL_S}"
+    return await _get_stats_cached()
 
 
 # ── Favicon ──────────────────────────────────────────────────────────────────
