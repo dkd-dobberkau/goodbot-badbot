@@ -168,6 +168,41 @@ async def rate_limit_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+# CSP keeps 'unsafe-inline' because the template ships inline script/style;
+# stored values are escaped at render time, so this layer blocks external
+# script injection as defense-in-depth.
+SECURITY_HEADERS = {
+    "Content-Security-Policy": (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "font-src 'self'; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
+        "object-src 'none'"
+    ),
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "Permissions-Policy": (
+        "accelerometer=(), camera=(), geolocation=(), gyroscope=(), "
+        "magnetometer=(), microphone=(), payment=(), usb=()"
+    ),
+}
+
+
+# Declared after rate_limit_middleware so it wraps the chain and the 429
+# response from rate-limiting also carries the security headers.
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    for k, v in SECURITY_HEADERS.items():
+        response.headers.setdefault(k, v)
+    return response
+
+
 # ── robots.txt ──────────────────────────────────────────────────────────────
 
 ROBOTS_TXT = """# This site monitors whether crawlers respect robots.txt.

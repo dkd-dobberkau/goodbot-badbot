@@ -5,8 +5,8 @@ services:
     ports:
       - "8000"
     environment:
-      MYSQL_HOST: mysql-scb5w0.pg-s-qgs0m1.db.project.host
+      MYSQL_HOST: ${MYSQL_HOST}
       MYSQL_PORT: "3306"
-      MYSQL_DB: mysql_scb5w0
-      MYSQL_USER: dbu_scb5w0
+      MYSQL_DB: ${MYSQL_DB}
+      MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}

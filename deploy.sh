@@ -11,9 +11,21 @@
 set -euo pipefail
 
 IMAGE="ghcr.io/dkd-dobberkau/goodbot-badbot"
-STACK_ID="55f2a30c-fc87-4c9f-8797-706c3eb4f24a"
-PROJECT_ID="p-ckgly6"
 HEALTH_URL="https://goodbot-badbot.com/api/stats"
+
+# Mittwald stack/project identifiers come from .deploy.env so the public
+# repo doesn't ship internal IDs. Sourced before pre-flight so missing
+# values fail fast.
+if [[ ! -f .deploy.env ]]; then
+  echo "ERROR: .deploy.env not found. Copy .deploy.env.example and fill in." >&2
+  exit 1
+fi
+set -a
+# shellcheck source=/dev/null
+. .deploy.env
+set +a
+: "${STACK_ID:?STACK_ID missing from .deploy.env}"
+: "${PROJECT_ID:?PROJECT_ID missing from .deploy.env}"
 
 # ── tag ──────────────────────────────────────────────────────────────────────
 if [[ $# -ge 1 ]]; then
@@ -49,11 +61,6 @@ docker buildx build \
 
 # ── deploy ───────────────────────────────────────────────────────────────────
 echo "[3/4] Deploy stack to Mittwald and recreate container"
-
-if [[ ! -f .deploy.env ]]; then
-  echo "ERROR: .deploy.env not found. Copy .deploy.env.example and fill in secrets." >&2
-  exit 1
-fi
 
 ENV_FILE="$(mktemp -t deploy.env.XXXX)"
 trap 'rm -f "${ENV_FILE}"' EXIT
