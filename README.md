@@ -60,6 +60,21 @@ GET /api/stats     # JSON: per-bot summary + recent violations
 GET /favicon.ico   # 🤖
 ```
 
+## Agent discoverability
+
+The site implements the HTTP-layer agent-readiness signals: a sitemap
+referenced from `robots.txt`, RFC 8288 `Link` headers on the homepage,
+Content Signals declaring the AI-usage policy (`search=yes, ai-input=yes,
+ai-train=no`), content negotiation for `Accept: text/markdown`, and a
+JWKS at `/.well-known/http-message-signatures-directory` for Web Bot
+Auth identity.
+
+DNS for AI Discovery (DNS-AID) is intentionally **not** implemented.
+DNS-AID exists to point agents at A2A / MCP / JSON-RPC endpoints;
+goodbot-badbot has no such endpoint to advertise. Publishing a SVCB
+record pointing at the HTML dashboard or the stats JSON would be
+compliance theatre. The site is an observer of agents, not an agent.
+
 ## Privacy
 
 IP addresses are SHA-256 hashed and truncated to the first 16 hex chars
