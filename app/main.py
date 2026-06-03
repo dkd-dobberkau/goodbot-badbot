@@ -217,6 +217,7 @@ ROBOTS_TXT = f"""# This site monitors whether crawlers respect robots.txt.
 # Results are published at https://goodbot-badbot.com
 
 User-agent: *
+Content-Signal: ai-input=yes, ai-train=no, search=yes
 Disallow: /do-not-crawl/
 Disallow: /private/
 Disallow: /honeypot/
