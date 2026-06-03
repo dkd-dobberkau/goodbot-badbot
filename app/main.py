@@ -26,6 +26,7 @@ MAX_UA_LEN = 1024
 RATE_LIMIT_RULES = (
     ("/api/stats",              60),
     ("/robots.txt",             60),
+    ("/sitemap.xml",            60),
     ("/do-not-crawl",           30),
     ("/private",                30),
     ("/honeypot",               30),
@@ -33,6 +34,8 @@ RATE_LIMIT_RULES = (
     ("/no-ai-allowed",          30),
     ("/robots-test",            30),
 )
+
+SITE_BASE_URL = "https://goodbot-badbot.com"
 
 # Known AI crawlers: (user-agent substring, display name, operator)
 KNOWN_BOTS = {
@@ -205,7 +208,7 @@ async def security_headers_middleware(request: Request, call_next):
 
 # ── robots.txt ──────────────────────────────────────────────────────────────
 
-ROBOTS_TXT = """# This site monitors whether crawlers respect robots.txt.
+ROBOTS_TXT = f"""# This site monitors whether crawlers respect robots.txt.
 # The paths listed below as Disallow are honeypots.
 # Any request to them is logged as a violation, regardless of
 # user-agent. The rest of the site is open to all bots so that
@@ -219,6 +222,8 @@ Disallow: /honeypot/
 Disallow: /training-data-forbidden/
 Disallow: /no-ai-allowed/
 Disallow: /robots-test/
+
+Sitemap: {SITE_BASE_URL}/sitemap.xml
 """
 
 
@@ -228,6 +233,30 @@ async def robots_txt(request: Request):
     ua = request.headers.get("user-agent", "")
     await log_visit(app.state.db_pool, "/robots.txt", ua, ip, is_honeypot=False)
     return ROBOTS_TXT
+
+
+# ── sitemap.xml ─────────────────────────────────────────────────────────────
+
+# lastmod freezes at import time, which equals container start = deploy time.
+# That's the right semantic: content only changes when a new image ships.
+SITEMAP_LASTMOD = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+SITEMAP_XML = f"""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>{SITE_BASE_URL}/</loc>
+    <lastmod>{SITEMAP_LASTMOD}</lastmod>
+  </url>
+</urlset>
+"""
+
+
+@app.get("/sitemap.xml")
+async def sitemap_xml(request: Request):
+    ip = request.client.host
+    ua = request.headers.get("user-agent", "")
+    await log_visit(app.state.db_pool, "/sitemap.xml", ua, ip, is_honeypot=False)
+    return Response(content=SITEMAP_XML, media_type="application/xml")
 
 
 # ── llms.txt (llmstxt.org standard) ──────────────────────────────────────────
