@@ -14,16 +14,32 @@ homepage and stops; a non-respectful one keeps going into the honeypots.
 ## Honeypot paths
 
 ```
-/do-not-crawl/
-/private/
-/honeypot/
-/training-data-forbidden/
-/no-ai-allowed/
-/robots-test/
+/do-not-crawl/             linked from homepage
+/training-data-forbidden/  linked from homepage
+/no-ai-allowed/            linked from homepage
+
+/private/                  unlinked anywhere
+/honeypot/                 unlinked anywhere
+/robots-test/              unlinked anywhere
 ```
 
-All listed in [`/robots.txt`](https://goodbot-badbot.com/robots.txt) as
-`Disallow`. Any hit on these paths = violation.
+All six listed in [`/robots.txt`](https://goodbot-badbot.com/robots.txt)
+as `Disallow`. Any hit on any of them is a violation, but the two
+groups measure subtly different things:
+
+- **Linked** (three paths, with visible `<a href>` on the homepage):
+  catches crawlers that follow links and ignore the corresponding
+  Disallow rule. The clearest possible signal of "didn't respect
+  robots.txt."
+- **Unlinked** (three paths, no `<a>` anywhere on the site): the only
+  way to discover them is to read `/robots.txt` and either use the
+  Disallow list as a seed for crawling ("treasure map" anti-pattern)
+  or guess paths from common names. A hit here implies the bot
+  actively used robots.txt as input.
+
+Without the linked subset, the site would only catch the second
+behaviour. Without the unlinked subset, the site couldn't distinguish
+"used robots.txt as a seed" from "happened to find a link."
 
 ## Identified bots
 

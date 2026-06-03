@@ -389,6 +389,66 @@
   .robots-content .comment  { color: var(--code-comment); }
   .robots-content .agent    { color: var(--yellow); }
 
+  /* VISIBLE TRAP SECTION */
+  .trap-box {
+    margin-top: 2rem;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .trap-header {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0.7rem 1rem;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .trap-explainer {
+    padding: 1rem;
+    color: var(--muted);
+    font-size: 0.82rem;
+    line-height: 1.6;
+  }
+
+  .trap-explainer strong {
+    color: var(--text);
+    font-weight: 600;
+  }
+
+  .trap-list {
+    list-style: none;
+    padding: 0 1rem 1rem;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+  }
+
+  .trap-list li {
+    padding: 0.25rem 0;
+  }
+
+  .trap-list a {
+    color: var(--red);
+    text-decoration: none;
+    border-bottom: 1px dashed var(--red);
+  }
+
+  .trap-list a:hover {
+    background: var(--verdict-bad-bg);
+  }
+
+  .trap-disclaimer {
+    padding: 0 1rem 1rem;
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    color: var(--dim);
+    letter-spacing: 0.05em;
+  }
+
   /* FOOTER */
   footer {
     border-top: 1px solid var(--border);
@@ -498,6 +558,29 @@
 <span class="disallow">Disallow: /training-data-forbidden/</span>
 <span class="disallow">Disallow: /no-ai-allowed/</span>
 <span class="disallow">Disallow: /robots-test/</span></div>
+    </div>
+
+    <div class="trap-box">
+      <div class="trap-header">visible link traps — linked & disallowed</div>
+      <div class="trap-explainer">
+        Three honeypot paths are <strong>linked from this page</strong> and
+        also <strong>Disallow</strong>'d in <code>/robots.txt</code>. A
+        crawler that follows a link and visits the target has unambiguously
+        ignored the rule — a "via link" violation.
+        <br><br>
+        The other three honeypot paths
+        (<code>/private/</code>, <code>/honeypot/</code>,
+        <code>/robots-test/</code>) have no links anywhere on the site.
+        A hit there means the bot used the <code>robots.txt</code>
+        Disallow list as a crawl seed ("treasure map") or guessed the
+        path — a "via guess" violation.
+      </div>
+      <ul class="trap-list">
+        <li>→ <a href="/no-ai-allowed/visible-trap">/no-ai-allowed/visible-trap</a></li>
+        <li>→ <a href="/training-data-forbidden/visible-trap">/training-data-forbidden/visible-trap</a></li>
+        <li>→ <a href="/do-not-crawl/visible-trap">/do-not-crawl/visible-trap</a></li>
+      </ul>
+      <div class="trap-disclaimer">// these links are for crawlers, not for you — clicking just adds noise</div>
     </div>
   </div>
 
