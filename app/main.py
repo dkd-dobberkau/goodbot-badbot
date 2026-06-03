@@ -382,7 +382,17 @@ async def favicon():
 
 # ── Frontend ─────────────────────────────────────────────────────────────────
 
+# RFC 8288 Link headers for agent discovery. Comma-separated single header is
+# equivalent to multiple Link headers per the RFC and simpler to inspect.
+HOMEPAGE_LINK_HEADER = ", ".join((
+    '</api/stats>; rel="service-desc"; type="application/json"',
+    '</llms.txt>; rel="service-doc"; type="text/markdown"',
+    '</sitemap.xml>; rel="sitemap"',
+))
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index():
     with open("templates/index.html") as f:
-        return f.read()
+        html = f.read()
+    return HTMLResponse(content=html, headers={"Link": HOMEPAGE_LINK_HEADER})
