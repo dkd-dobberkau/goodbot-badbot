@@ -391,8 +391,26 @@ HOMEPAGE_LINK_HEADER = ", ".join((
 ))
 
 
+def _wants_markdown(accept_header: str) -> bool:
+    # Substring match is enough — anything that names text/markdown in Accept
+    # is opting in; browsers send */* or text/html and get HTML by default.
+    return "text/markdown" in accept_header.lower()
+
+
 @app.get("/", response_class=HTMLResponse)
-async def index():
+async def index(request: Request):
+    base_headers = {
+        "Link": HOMEPAGE_LINK_HEADER,
+        "Vary": "Accept",
+    }
+    if _wants_markdown(request.headers.get("accept", "")):
+        # ~4 chars/token is the standard rough estimate for English prose.
+        tokens = max(1, len(LLMS_TXT) // 4)
+        return Response(
+            content=LLMS_TXT,
+            media_type="text/markdown; charset=utf-8",
+            headers={**base_headers, "X-Markdown-Tokens": str(tokens)},
+        )
     with open("templates/index.html") as f:
         html = f.read()
-    return HTMLResponse(content=html, headers={"Link": HOMEPAGE_LINK_HEADER})
+    return HTMLResponse(content=html, headers=base_headers)
