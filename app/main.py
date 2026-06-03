@@ -38,28 +38,69 @@ RATE_LIMIT_RULES = (
 
 SITE_BASE_URL = "https://goodbot-badbot.com"
 
-# Known AI crawlers: (user-agent substring, display name, operator)
+# Known AI crawlers: (user-agent substring, display name, operator).
+# Substring match runs in insertion order — longer/more-specific keys MUST
+# come before shorter ones that they contain (applebot-extended before
+# applebot, etc.).
 KNOWN_BOTS = {
-    "gptbot":           ("GPTBot",            "OpenAI"),
-    "chatgpt-user":     ("ChatGPT-User",       "OpenAI"),
-    "oai-searchbot":    ("OAI-SearchBot",      "OpenAI"),
-    "claudebot":        ("ClaudeBot",          "Anthropic"),
-    "claude-web":       ("Claude-Web",         "Anthropic"),
-    "ccbot":            ("CCBot",              "Common Crawl"),
-    "bytespider":       ("Bytespider",         "ByteDance"),
-    "amazonbot":        ("Amazonbot",          "Amazon"),
-    "applebot":         ("Applebot-Extended",  "Apple"),
-    "diffbot":          ("Diffbot",            "Diffbot"),
-    "facebookbot":      ("FacebookBot",        "Meta"),
-    "meta-externalagent": ("Meta-ExternalAgent", "Meta"),
-    "google-extended":  ("Google-Extended",    "Google"),
-    "googleother":      ("GoogleOther",        "Google"),
-    "perplexitybot":    ("PerplexityBot",      "Perplexity"),
-    "youbot":           ("YouBot",             "You.com"),
-    "cohere-ai":        ("cohere-ai",          "Cohere"),
-    "anthropic-ai":     ("anthropic-ai",       "Anthropic"),
-    "omgili":           ("Omgili",             "Webz.io"),
-    "iaskspider":       ("IaskSpider",         "iAsk"),
+    # OpenAI
+    "gptbot":                          ("GPTBot",              "OpenAI"),
+    "chatgpt-agent":                   ("ChatGPT-Agent",       "OpenAI"),
+    "chatgpt-user":                    ("ChatGPT-User",        "OpenAI"),
+    "oai-searchbot":                   ("OAI-SearchBot",       "OpenAI"),
+    # Anthropic
+    "claudebot":                       ("ClaudeBot",           "Anthropic"),
+    "claude-user":                     ("Claude-User",         "Anthropic"),
+    "claude-code":                     ("Claude-Code",         "Anthropic"),
+    "claude-web":                      ("Claude-Web",          "Anthropic"),
+    "anthropic-ai":                    ("anthropic-ai",        "Anthropic"),
+    # Google
+    "google-extended":                 ("Google-Extended",     "Google"),
+    "googleother":                     ("GoogleOther",         "Google"),
+    "gemini-deep-research":            ("Gemini-Deep-Research", "Google"),
+    "google-notebooklm":               ("NotebookLM",          "Google"),
+    # Apple — extended MUST come before the generic applebot match
+    "applebot-extended":               ("Applebot-Extended",   "Apple"),
+    "applebot":                        ("Applebot",            "Apple"),
+    # Meta
+    "meta-externalagent":              ("Meta-ExternalAgent",  "Meta"),
+    "meta-externalfetcher":            ("Meta-ExternalFetcher", "Meta"),
+    "facebookbot":                     ("FacebookBot",         "Meta"),
+    # Perplexity
+    "perplexitybot":                   ("PerplexityBot",       "Perplexity"),
+    "perplexity-user":                 ("Perplexity-User",     "Perplexity"),
+    # Amazon
+    "amazonbot":                       ("Amazonbot",           "Amazon"),
+    "novaact":                         ("Nova Act",            "Amazon"),
+    # ByteDance
+    "bytespider":                      ("Bytespider",          "ByteDance"),
+    # Cohere — full crawler name MUST come before the generic cohere-ai match
+    "cohere-training-data-crawler":    ("Cohere-Training-Data-Crawler", "Cohere"),
+    "cohere-ai":                       ("cohere-ai",           "Cohere"),
+    # Mistral
+    "mistralai-user":                  ("MistralAI-User",      "Mistral"),
+    # DuckDuckGo
+    "duckassistbot":                   ("DuckAssistBot",       "DuckDuckGo"),
+    # Common Crawl / data crawlers
+    "ccbot":                           ("CCBot",               "Common Crawl"),
+    "diffbot":                         ("Diffbot",             "Diffbot"),
+    "omgili":                          ("Omgili",              "Webz.io"),
+    "webzio-extended":                 ("Webzio-Extended",     "Webz.io"),
+    # Other AI search / fetchers
+    "youbot":                          ("YouBot",              "You.com"),
+    "iaskspider":                      ("IaskSpider",          "iAsk"),
+    "phindbot":                        ("PhindBot",            "Phind"),
+    "bravebot":                        ("BraveBot",            "Brave"),
+    "kagi-fetcher":                    ("Kagi-Fetcher",        "Kagi"),
+    "linerbot":                        ("LinerBot",            "Liner"),
+    "exabot":                          ("ExaBot",              "Exa"),
+    "tavilybot":                       ("TavilyBot",           "Tavily"),
+    "firecrawlagent":                  ("FirecrawlAgent",      "Firecrawl"),
+    "chatglm-spider":                  ("ChatGLM-Spider",      "Zhipu AI"),
+    # Agentic frameworks / IDE tools
+    "devin":                           ("Devin",               "Cognition"),
+    "manus-user":                      ("Manus-User",          "Manus"),
+    "apifybot":                        ("ApifyBot",            "Apify"),
 }
 
 # Honeypot paths (blocked in robots.txt)
