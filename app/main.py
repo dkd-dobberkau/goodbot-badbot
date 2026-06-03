@@ -5,11 +5,13 @@ goodbot-badbot.com — AI Crawler robots.txt compliance monitor
 import asyncio
 import base64
 import hashlib
+import json
 import os
 import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 
 import aiomysql
 import http_sfv
@@ -112,6 +114,38 @@ KNOWN_BOTS = {
     "manus-user":                      ("Manus-User",          "Manus"),
     "apifybot":                        ("ApifyBot",            "Apify"),
 }
+
+# Extend KNOWN_BOTS with Cloudflare Radar's verified-bots directory, scoped to
+# the three AI categories. The dataset is vendored next to this file; refresh
+# with: curl -sL https://raw.githubusercontent.com/microlinkhq/cloudflare-bot-directory/master/src/index.json -o app/cf_bots.json
+# Patterns that overlap with the curated entries above are dropped so the
+# longer-first matching invariant (e.g. applebot-extended before applebot) holds.
+_CF_BOTS_FILE = Path(__file__).parent / "cf_bots.json"
+_CF_AI_CATEGORIES = {"AI_CRAWLER", "AI_ASSISTANT", "AI_SEARCH"}
+
+
+def _load_cf_bot_additions(known: dict[str, tuple[str, str]]) -> dict[str, tuple[str, str]]:
+    try:
+        entries = json.loads(_CF_BOTS_FILE.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    additions: dict[str, tuple[str, str]] = {}
+    for bot in entries:
+        if bot.get("category") not in _CF_AI_CATEGORIES:
+            continue
+        name = bot.get("name") or bot.get("slug")
+        operator = bot.get("operator") or "Unknown"
+        for raw in bot.get("userAgentPatterns") or []:
+            pattern = raw.lower().strip().rstrip("/")
+            if not pattern or pattern in known:
+                continue
+            if any(k in pattern or pattern in k for k in known):
+                continue
+            additions.setdefault(pattern, (name, operator))
+    return dict(sorted(additions.items(), key=lambda kv: -len(kv[0])))
+
+
+KNOWN_BOTS.update(_load_cf_bot_additions(KNOWN_BOTS))
 
 # Honeypot paths (blocked in robots.txt)
 HONEYPOT_PATHS = [
