@@ -39,6 +39,7 @@ RATE_LIMIT_RULES = (
     ("/api/stats",              60),
     ("/robots.txt",             60),
     ("/sitemap.xml",            60),
+    ("/llms.txt",               60),
     ("/.well-known/http-message-signatures-directory", 60),
     ("/do-not-crawl",           30),
     ("/private",                30),
@@ -578,7 +579,14 @@ The raw IP is never written to disk.
 
 
 @app.get("/llms.txt")
-async def llms_txt():
+async def llms_txt(request: Request):
+    ip = request.client.host
+    ua = request.headers.get("user-agent", "")
+    if _should_log_meta_visit("/llms.txt", ua):
+        await log_visit(
+            app.state.db_pool, "/llms.txt", ua, ip, is_honeypot=False,
+            signature_status=request.state.signature_status,
+        )
     return Response(content=LLMS_TXT, media_type="text/markdown; charset=utf-8")
 
 
