@@ -161,6 +161,15 @@ HONEYPOT_PATHS = [
     "/robots-test",
 ]
 
+# Agent/LLM discovery files an agent deliberately fetches to learn how to use
+# the site — distinct from honeypots (violations) and from robots/sitemap
+# (generic crawler meta). Reads here are the "Discovery Reads" dashboard
+# signal. AGENTS_MD_PATHS is the subset served by the agents_md handler; the
+# three probe locations are kept separate so we can see which one agents reach
+# for, but the dashboard sums them under one "agents.md" column.
+AGENTS_MD_PATHS = ("/AGENTS.md", "/agents.md", "/.well-known/agents.md")
+DISCOVERY_PATHS = ("/llms.txt", *AGENTS_MD_PATHS)
+
 
 DB_CONFIG = {
     "host":     os.getenv("MYSQL_HOST", "127.0.0.1"),
@@ -719,12 +728,44 @@ async def _compute_stats() -> dict:
             await cur.execute("SELECT COUNT(*) AS c FROM visits WHERE signature_status = 'verified'")
             total_verified = (await cur.fetchone())["c"]
 
+            # Discovery reads: per known bot, how many times it fetched the
+            # LLM/agent discovery files. llms.txt and the three agents.md probe
+            # locations are reported as two columns. Placeholders are built from
+            # the path tuples so the value list stays parameterised.
+            agents_ph = ",".join(["%s"] * len(AGENTS_MD_PATHS))
+            discovery_ph = ",".join(["%s"] * len(DISCOVERY_PATHS))
+            await cur.execute(
+                f"""
+                SELECT bot_name, operator,
+                       CAST(SUM(path = '/llms.txt') AS UNSIGNED) AS llms_reads,
+                       CAST(SUM(path IN ({agents_ph})) AS UNSIGNED) AS agents_reads,
+                       COUNT(*) AS total_reads,
+                       MAX(ts) AS last_seen
+                FROM visits
+                WHERE path IN ({discovery_ph})
+                  AND bot_name IS NOT NULL
+                GROUP BY bot_name, operator
+                ORDER BY total_reads DESC, last_seen DESC
+                LIMIT 50
+                """,
+                (*AGENTS_MD_PATHS, *DISCOVERY_PATHS),
+            )
+            discovery = await cur.fetchall()
+
+            await cur.execute(
+                f"SELECT COUNT(*) AS c FROM visits WHERE path IN ({discovery_ph})",
+                DISCOVERY_PATHS,
+            )
+            total_discovery = (await cur.fetchone())["c"]
+
     return {
         "summary": summary,
         "recent_violations": recent,
         "total_violations": total_violations,
         "total_bots_seen": total_bots,
         "total_verified": total_verified,
+        "discovery_reads": discovery,
+        "total_discovery_reads": total_discovery,
     }
 
 

@@ -449,6 +449,40 @@
     letter-spacing: 0.05em;
   }
 
+  /* DISCOVERY READS */
+  .discovery-section {
+    border-bottom: 1px solid var(--border);
+    padding: 2.5rem 3rem;
+  }
+
+  .discovery-intro {
+    color: var(--muted);
+    font-size: 0.85rem;
+    line-height: 1.7;
+    max-width: 640px;
+    margin-bottom: 1.8rem;
+    font-weight: 300;
+  }
+
+  .discovery-intro strong { color: var(--text); font-weight: 600; }
+
+  .read-count {
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    text-align: right;
+  }
+
+  .read-count.zero { color: var(--dim); }
+  .read-count.nonzero { color: var(--green); }
+
+  .last-seen {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--muted);
+    text-align: right;
+    white-space: nowrap;
+  }
+
   /* FOOTER */
   footer {
     border-top: 1px solid var(--border);
@@ -503,7 +537,7 @@
     .main-grid { grid-template-columns: 1fr; }
     .stats-row { grid-template-columns: 1fr; }
     .stat-box  { border-right: none; border-bottom: 1px solid var(--border); }
-    header, .hero, .panel, .feed-panel, footer { padding-left: 1.5rem; padding-right: 1.5rem; }
+    header, .hero, .panel, .feed-panel, .discovery-section, footer { padding-left: 1.5rem; padding-right: 1.5rem; }
   }
 </style>
 </head>
@@ -619,6 +653,35 @@
   </div>
 </div>
 
+<section class="discovery-section">
+  <div class="panel-title">Discovery Reads — who fetches llms.txt &amp; agents.md</div>
+  <p class="discovery-intro">
+    These files are <strong>invitations</strong>, not traps:
+    <code>/llms.txt</code> is the LLM-oriented site summary, and
+    <code>/agents.md</code> (served at <code>/AGENTS.md</code>,
+    <code>/agents.md</code> and <code>/.well-known/agents.md</code>) is a
+    probe surface for agents that look for usage instructions. Reading them is
+    <strong>not a violation</strong> — it is the opposite signal: an agent
+    deliberately doing discovery. So far <strong id="discoveryTotal">—</strong>
+    discovery reads have been logged.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th>Bot</th>
+        <th>Operator</th>
+        <th style="text-align:right">llms.txt</th>
+        <th style="text-align:right">agents.md</th>
+        <th style="text-align:right">Total</th>
+        <th style="text-align:right">Last read</th>
+      </tr>
+    </thead>
+    <tbody id="discoveryTable">
+      <tr><td colspan="6" class="empty-state">Loading…</td></tr>
+    </tbody>
+  </table>
+</section>
+
 <footer>
   <span>goodbot-badbot.com — personal experiment by Olivier Dobberkau · <a href="https://github.com/dkd-dobberkau/goodbot-badbot" target="_blank" rel="noopener noreferrer">source on GitHub</a></span>
   <span id="lastUpdate">—</span>
@@ -649,8 +712,10 @@ function getDemoData() {
     total_violations: 0,
     total_bots_seen: 0,
     total_verified: 0,
+    total_discovery_reads: 0,
     summary: [],
-    recent_violations: []
+    recent_violations: [],
+    discovery_reads: []
   };
 }
 
@@ -713,6 +778,33 @@ function renderStats(data) {
         <div class="feed-bot">${esc(v.bot_name || 'Unknown')} · ${esc(v.operator || '?')}${sigBadge}</div>
         <div class="feed-path">${linkBadge}${esc(v.path)}</div>
       </div>`;
+    }).join('');
+  }
+
+  document.getElementById('discoveryTotal').textContent =
+    (data.total_discovery_reads || 0).toLocaleString();
+
+  const discTable = document.getElementById('discoveryTable');
+  const discovery = data.discovery_reads || [];
+  if (discovery.length === 0) {
+    discTable.innerHTML = `<tr><td colspan="6" class="empty-state">No discovery reads logged yet.</td></tr>`;
+  } else {
+    discTable.innerHTML = discovery.map(row => {
+      const llms = Number(row.llms_reads) || 0;
+      const agents = Number(row.agents_reads) || 0;
+      const total = Number(row.total_reads) || 0;
+      const cell = (n) => `<td class="read-count ${n > 0 ? 'nonzero' : 'zero'}">${n > 0 ? n : '—'}</td>`;
+      const lastRead = row.last_seen
+        ? new Date(row.last_seen + 'Z').toLocaleString('en-GB')
+        : '—';
+      return `<tr>
+        <td><span class="bot-name">${esc(row.bot_name)}</span></td>
+        <td><span class="operator">${esc(row.operator)}</span></td>
+        ${cell(llms)}
+        ${cell(agents)}
+        <td class="read-count nonzero">${total}</td>
+        <td class="last-seen">${esc(lastRead)}</td>
+      </tr>`;
     }).join('');
   }
 
