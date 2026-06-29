@@ -26,6 +26,8 @@ from http_message_signatures import (
     algorithms,
 )
 
+from app import blog
+
 # Hard caps to keep oversized inputs from blowing past column limits or
 # bloating the DB. VARCHAR(512) is the path column; UA TEXT is generous.
 MAX_PATH_LEN = 500
@@ -40,6 +42,7 @@ RATE_LIMIT_RULES = (
     ("/robots.txt",             60),
     ("/sitemap.xml",            60),
     ("/llms.txt",               60),
+    ("/blog",                   60),
     ("/AGENTS.md",              60),
     ("/agents.md",              60),
     ("/.well-known/agents.md",  60),
@@ -496,14 +499,23 @@ async def robots_txt(request: Request):
 # That's the right semantic: content only changes when a new image ships.
 SITEMAP_LASTMOD = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-SITEMAP_XML = f"""<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url>
-    <loc>{SITE_BASE_URL}/</loc>
-    <lastmod>{SITEMAP_LASTMOD}</lastmod>
-  </url>
-</urlset>
-"""
+def _build_sitemap() -> str:
+    urls = [
+        f"  <url>\n    <loc>{SITE_BASE_URL}/</loc>\n    <lastmod>{SITEMAP_LASTMOD}</lastmod>\n  </url>",
+        f"  <url>\n    <loc>{SITE_BASE_URL}/blog</loc>\n    <lastmod>{SITEMAP_LASTMOD}</lastmod>\n  </url>",
+    ]
+    for post in blog.list_posts():
+        lastmod = post.date or SITEMAP_LASTMOD
+        urls.append(
+            f"  <url>\n    <loc>{SITE_BASE_URL}/blog/{post.slug}</loc>\n    <lastmod>{lastmod}</lastmod>\n  </url>"
+        )
+    body = "\n".join(urls)
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"{body}\n"
+        "</urlset>\n"
+    )
 
 
 @app.get("/sitemap.xml")
@@ -515,7 +527,7 @@ async def sitemap_xml(request: Request):
             app.state.db_pool, "/sitemap.xml", ua, ip, is_honeypot=False,
             signature_status=request.state.signature_status,
         )
-    return Response(content=SITEMAP_XML, media_type="application/xml")
+    return Response(content=_build_sitemap(), media_type="application/xml")
 
 
 # ── Web Bot Auth: JWKS for outbound identity ────────────────────────────────
@@ -578,6 +590,10 @@ trips a honeypot, where its visit is recorded.
 - `/training-data-forbidden/`
 - `/no-ai-allowed/`
 - `/robots-test/`
+
+## Writing
+
+- [Blog](https://goodbot-badbot.com/blog): methodology notes and findings
 
 ## Source code
 
@@ -661,6 +677,28 @@ async def agents_md(request: Request):
             signature_status=request.state.signature_status,
         )
     return Response(content=AGENTS_MD, media_type="text/markdown; charset=utf-8")
+
+
+# ── Blog ──────────────────────────────────────────────────────────────────────
+
+@app.get("/blog")
+async def blog_index(request: Request):
+    if _wants_markdown(request.headers.get("accept", "")):
+        return Response(
+            content=blog.render_index_markdown(),
+            media_type="text/markdown; charset=utf-8",
+        )
+    return HTMLResponse(content=blog.render_index_html())
+
+
+@app.get("/blog/{slug}")
+async def blog_post(request: Request, slug: str):
+    post = blog.get_post(slug)
+    if post is None:
+        return PlainTextResponse("Not Found", status_code=404)
+    if _wants_markdown(request.headers.get("accept", "")):
+        return Response(content=post.md, media_type="text/markdown; charset=utf-8")
+    return HTMLResponse(content=blog.render_post_html(post))
 
 
 # ── Honeypot endpoints ───────────────────────────────────────────────────────

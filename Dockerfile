@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY --chown=appuser:appuser app/ ./app/
 COPY --chown=appuser:appuser templates/ ./templates/
 COPY --chown=appuser:appuser vendor/ ./vendor/
+COPY --chown=appuser:appuser content/ ./content/
 
 RUN mkdir -p data && chown appuser:appuser data
 
