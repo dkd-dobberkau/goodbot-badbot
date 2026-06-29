@@ -40,6 +40,9 @@ RATE_LIMIT_RULES = (
     ("/robots.txt",             60),
     ("/sitemap.xml",            60),
     ("/llms.txt",               60),
+    ("/AGENTS.md",              60),
+    ("/agents.md",              60),
+    ("/.well-known/agents.md",  60),
     ("/.well-known/http-message-signatures-directory", 60),
     ("/do-not-crawl",           30),
     ("/private",                30),
@@ -588,6 +591,67 @@ async def llms_txt(request: Request):
             signature_status=request.state.signature_status,
         )
     return Response(content=LLMS_TXT, media_type="text/markdown; charset=utf-8")
+
+
+# ── agents.md (agent-discovery probe surface) ─────────────────────────────────
+
+# This is NOT the AGENTS.md coding-agent standard (that lives in the repo root
+# for tools working ON this codebase). It is served purely as a measurement
+# surface: some agents probe /AGENTS.md or /.well-known/agents.md at runtime to
+# discover how to use a site. We answer honestly — the site exposes no callable
+# agent endpoint, so there is nothing to advertise (publishing a fake manifest
+# would be the same compliance theatre we reject for DNS-AID) — and log who
+# asked, exactly like robots.txt / sitemap.xml / llms.txt. The point is to
+# observe agent discovery behaviour, not to participate in it.
+AGENTS_MD = """# goodbot-badbot — agents.md
+
+> This site is an *observer* of AI agents and crawlers, not an agent itself.
+> It exposes no callable agent, tool, or API endpoint to act on. There is
+> nothing here to invoke — only something to read.
+
+## What this is
+
+goodbot-badbot.com measures whether crawlers respect robots.txt. Six honeypot
+paths are listed as `Disallow` in /robots.txt. Any request to one of them is
+logged as a violation, regardless of user-agent, and published live.
+
+## What an agent can read here
+
+- [Live scoreboard](https://goodbot-badbot.com/)
+- [Machine-readable stats](https://goodbot-badbot.com/api/stats)
+- [LLM-oriented summary](https://goodbot-badbot.com/llms.txt)
+- [Crawl rules](https://goodbot-badbot.com/robots.txt)
+
+Please honour /robots.txt. The `Disallow` list is the entire experiment.
+
+## No agent endpoints
+
+There is no MCP server, A2A endpoint, or JSON-RPC tool to discover here. This
+file exists so that agent *discovery behaviour* can itself be observed.
+
+## Transparency
+
+Requests to this file are logged (user-agent plus a SHA-256-truncated IP hash,
+the same privacy model as the rest of the site) so we can measure which agents
+probe for it.
+"""
+
+
+@app.get("/AGENTS.md")
+@app.get("/agents.md")
+@app.get("/.well-known/agents.md")
+async def agents_md(request: Request):
+    ip = request.client.host
+    ua = request.headers.get("user-agent", "")
+    # Log under the exact path requested so the three probe locations are
+    # distinguishable in the data — which one an agent reaches for is signal.
+    path = request.url.path
+    if _should_log_meta_visit(path, ua):
+        await log_visit(
+            app.state.db_pool, path, ua, ip, is_honeypot=False,
+            signature_status=request.state.signature_status,
+        )
+    return Response(content=AGENTS_MD, media_type="text/markdown; charset=utf-8")
 
 
 # ── Honeypot endpoints ───────────────────────────────────────────────────────

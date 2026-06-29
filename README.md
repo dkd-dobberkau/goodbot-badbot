@@ -91,6 +91,16 @@ goodbot-badbot has no such endpoint to advertise. Publishing a SVCB
 record pointing at the HTML dashboard or the stats JSON would be
 compliance theatre. The site is an observer of agents, not an agent.
 
+For the same reason there is no `ai-catalog.json` (ARD) manifest: it
+advertises agent/tool endpoints the site does not have. There **is** a
+short `agents.md`, served at `/AGENTS.md`, `/agents.md`, and
+`/.well-known/agents.md`, but only as a *measurement surface* — it
+states plainly that the site has no callable endpoint, and every read is
+logged (per probe location, so the three are distinguishable) to observe
+which agents reach for it. This is not the repository
+[`AGENTS.md`](AGENTS.md) coding-agent standard, which lives in the repo
+root for tools working on this codebase.
+
 ## Privacy
 
 IP addresses are SHA-256 hashed and truncated to the first 16 hex chars
