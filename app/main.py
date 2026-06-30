@@ -309,9 +309,20 @@ def _rate_check(key: tuple[str, str], limit: int, window_s: int = 60) -> bool:
 # Per-URL JWKS cache. Web Bot Auth says caches should be short-lived because
 # operators rotate keys; 1 h is the conservative default.
 _jwks_cache: dict[str, tuple[float, dict]] = {}
-_jwks_lock = asyncio.Lock()
+# One lock per URL so a slow fetch for operator A does not serialise the
+# cache double-check for operator B. The locks dict is only mutated by
+# synchronous get/setdefault (no await in between), so it is safe to grow
+# from concurrent coroutines on the single-threaded event loop.
+_jwks_locks: dict[str, asyncio.Lock] = {}
 JWKS_CACHE_TTL_S = 3600
 JWKS_FETCH_TIMEOUT_S = 3.0
+
+
+def _jwks_lock_for(url: str) -> asyncio.Lock:
+    lock = _jwks_locks.get(url)
+    if lock is None:
+        lock = _jwks_locks.setdefault(url, asyncio.Lock())
+    return lock
 
 
 async def _get_jwks(url: str) -> dict | None:
@@ -319,7 +330,7 @@ async def _get_jwks(url: str) -> dict | None:
     entry = _jwks_cache.get(url)
     if entry and (now - entry[0]) < JWKS_CACHE_TTL_S:
         return entry[1]
-    async with _jwks_lock:
+    async with _jwks_lock_for(url):
         entry = _jwks_cache.get(url)
         if entry and (time.monotonic() - entry[0]) < JWKS_CACHE_TTL_S:
             return entry[1]
