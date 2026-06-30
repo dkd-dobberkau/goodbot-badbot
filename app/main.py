@@ -397,10 +397,24 @@ async def _verify_request_signature(request: Request) -> str | None:
         headers=dict(headers),
     )
     try:
-        verifier.verify(httpx_req)
-        return "verified"
+        results = verifier.verify(httpx_req)
     except Exception:
         return "failed"
+
+    # Web Bot Auth draft §4: at minimum @authority and signature-agent MUST
+    # be covered.  covered_components keys use the sf-string serialisation
+    # produced by http_sfv.List, so the required keys are the literals
+    # '"@authority"' and '"signature-agent"' (with embedded quotes).
+    # We accept the signature as verified only when at least one label
+    # satisfies both constraints.
+    _REQUIRED_COMPONENTS = {'"@authority"', '"signature-agent"'}
+    if not any(
+        _REQUIRED_COMPONENTS.issubset(result.covered_components)
+        for result in results
+    ):
+        return "failed"
+
+    return "verified"
 
 
 # Declared before rate_limit_middleware so rate_limit wraps it from outside —
