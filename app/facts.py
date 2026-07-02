@@ -165,3 +165,76 @@ def list_facts() -> list[Fact]:
 
 def get_fact(slug: str) -> Fact | None:
     return _registry().get(slug)
+
+
+def _base_template() -> str:
+    return (_TEMPLATE_DIR / "blog_base.html").read_text(encoding="utf-8")
+
+
+def _page(title: str, content_html: str, head_extra: str = "") -> str:
+    return (
+        _base_template()
+        .replace("__CONTENT__", content_html)
+        .replace("__TITLE__", _html.escape(title))
+        .replace("__HEAD_EXTRA__", head_extra)
+    )
+
+
+def _jsonld_head(fact: Fact) -> str:
+    # CSP allows inline ld+json (script-src 'unsafe-inline'). The payload is
+    # our own serialised dict, not user input, so no escaping is needed.
+    return f'<script type="application/ld+json">\n{fact.jsonld}\n</script>'
+
+
+def render_fact_html(fact: Fact) -> str:
+    content = (
+        '<main class="article">'
+        '<a class="back-link" href="/facts">← all grounding pages</a>'
+        f'<h1 class="article-title">{_html.escape(fact.title)}</h1>'
+        f'<div class="article-date">Last updated {_html.escape(fact.date_modified)}</div>'
+        f"{fact.html}"
+        "</main>"
+    )
+    return _page(fact.title, content, head_extra=_jsonld_head(fact))
+
+
+def render_index_html() -> str:
+    facts = list_facts()
+    if not facts:
+        items = '<p class="empty">No grounding pages yet.</p>'
+    else:
+        rows = "".join(
+            f'<li class="post-link">'
+            f'<a href="/facts/{_html.escape(f.slug)}">'
+            f'<span class="post-title">{_html.escape(f.title)}</span></a>'
+            f'<div class="post-meta">{_html.escape(f.entity_type)} · {_html.escape(f.segment)}</div>'
+            f'<p class="post-summary">{_html.escape(f.summary)}</p>'
+            f"</li>"
+            for f in facts
+        )
+        items = f'<ul class="post-list">{rows}</ul>'
+    intro = (
+        '<p class="post-summary">Factual, machine-readable definitions of the '
+        'entities this site is about — structured so AI systems can cite them '
+        'without guessing. Reads are logged as a discovery signal.</p>'
+    )
+    content = (
+        f'<main class="article"><h1 class="article-title">Grounding pages</h1>'
+        f'{intro}{items}</main>'
+    )
+    return _page("Grounding pages", content)
+
+
+def render_fact_markdown(fact: Fact) -> str:
+    # Serve the raw source verbatim, same contract as the blog.
+    return fact.md
+
+
+def render_index_markdown() -> str:
+    facts = list_facts()
+    lines = ["# Grounding pages", ""]
+    if not facts:
+        lines.append("No grounding pages yet.")
+    for f in facts:
+        lines.append(f"- [{f.title}](/facts/{f.slug}) — {f.summary}")
+    return "\n".join(lines) + "\n"

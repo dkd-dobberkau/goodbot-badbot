@@ -87,6 +87,37 @@ def main() -> int:
     except ImportError:
         print("SKIP _fact_from_source tests (markdown-it-py not installed)")
 
+    try:
+        import markdown_it  # noqa: F401
+        from app.facts import (
+            render_index_html, render_index_markdown,
+            render_fact_html, render_fact_markdown,
+        )
+        raw = (
+            "---\ntitle: goodbot-badbot\nentity: goodbot-badbot\n"
+            "entity_type: Dataset\nsegment: seg\nsummary: A summary.\n"
+            "canonical: https://goodbot-badbot.com/facts/goodbot-badbot\n"
+            "date_modified: 2026-07-02\n---\n## goodbot-badbot is\n\nBody.\n"
+        )
+        fact = _fact_from_source(raw, "goodbot-badbot")
+
+        fh = render_fact_html(fact)
+        check("fact html has jsonld script", 'application/ld+json' in fh)
+        check("fact html has back link", 'href="/facts"' in fh)
+        check("fact html has title", "goodbot-badbot" in fh)
+        check("fact html injected via head token", "__HEAD_EXTRA__" not in fh)
+
+        fm = render_fact_markdown(fact)
+        check("fact markdown is raw source", fm == raw)
+
+        im = render_index_markdown()
+        check("index markdown heading", im.startswith("# Grounding pages"))
+
+        ih = render_index_html()
+        check("index html no leftover token", "__CONTENT__" not in ih)
+    except ImportError:
+        print("SKIP renderer tests (markdown-it-py not installed)")
+
     print(f"\n{failures} failures")
     return 0 if failures == 0 else 1
 

@@ -127,12 +127,13 @@ def _base_template() -> str:
     return (_TEMPLATE_DIR / "blog_base.html").read_text(encoding="utf-8")
 
 
-def _page(title: str, content_html: str) -> str:
+def _page(title: str, content_html: str, head_extra: str = "") -> str:
     # Replace content first; titles/content never contain the literal tokens.
     return (
         _base_template()
         .replace("__CONTENT__", content_html)
         .replace("__TITLE__", _html.escape(title))
+        .replace("__HEAD_EXTRA__", head_extra)
     )
 
 
