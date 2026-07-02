@@ -101,10 +101,15 @@ token. CSP already allows this (`script-src 'self' 'unsafe-inline'`).
 
 - `entity_type: Dataset` →
   `{"@context":"https://schema.org","@type":"Dataset", name, description,
-  url, dateModified, creator:{"@type":"Organization","name":"dkd"},
+  url, dateModified,
+  creator:{"@type":"Organization","name":"dkd Internet Service GmbH",
+  "url":"https://www.dkd.de"},
   isAccessibleForFree:true, license:"https://opensource.org/licenses/MIT",
   distribution:{"@type":"DataDownload","encodingFormat":"application/json",
   "contentUrl":"https://goodbot-badbot.com/api/stats"}}`
+
+The organization identity (`dkd Internet Service GmbH`, `https://www.dkd.de`)
+is a shared constant in `app/facts.py`, reused for the `creator` field.
 - `entity_type: DefinedTerm` →
   `{"@context":"https://schema.org","@type":"DefinedTerm", name, description,
   url, inDefinedTermSet:"https://goodbot-badbot.com/facts"}`
