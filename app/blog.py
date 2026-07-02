@@ -68,8 +68,9 @@ def _renderer():
     global _md
     if _md is None:
         from markdown_it import MarkdownIt
-        # CommonMark preset leaves raw HTML in source escaped (safe default).
-        _md = MarkdownIt("commonmark")
+        # CommonMark preset, but with raw HTML pass-through disabled so any
+        # stray HTML in a body is escaped rather than rendered (bodies are prose).
+        _md = MarkdownIt("commonmark", {"html": False})
     return _md
 
 

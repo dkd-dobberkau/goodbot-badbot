@@ -68,7 +68,7 @@ def build_jsonld(meta: dict) -> dict:
             "description": description,
             "url": url,
             "dateModified": meta.get("date_modified", ""),
-            "creator": ORG,
+            "creator": dict(ORG),
             "isAccessibleForFree": True,
             "license": MIT_LICENSE,
             "distribution": {
@@ -102,7 +102,9 @@ def _renderer():
     global _md
     if _md is None:
         from markdown_it import MarkdownIt
-        _md = MarkdownIt("commonmark")
+        # CommonMark preset, but with raw HTML pass-through disabled so any
+        # stray HTML in a body is escaped rather than rendered (bodies are prose).
+        _md = MarkdownIt("commonmark", {"html": False})
     return _md
 
 
@@ -181,9 +183,11 @@ def _page(title: str, content_html: str, head_extra: str = "") -> str:
 
 
 def _jsonld_head(fact: Fact) -> str:
-    # CSP allows inline ld+json (script-src 'unsafe-inline'). The payload is
-    # our own serialised dict, not user input, so no escaping is needed.
-    return f'<script type="application/ld+json">\n{fact.jsonld}\n</script>'
+    # CSP allows inline ld+json. The payload is our own serialised dict, but
+    # json.dumps does not escape "</", so defuse a "</script>" breakout should
+    # a frontmatter field ever contain one ("\/" is a valid JSON escape for "/").
+    safe = fact.jsonld.replace("</", "<\\/")
+    return f'<script type="application/ld+json">\n{safe}\n</script>'
 
 
 def render_fact_html(fact: Fact) -> str:
