@@ -26,7 +26,7 @@ from http_message_signatures import (
     algorithms,
 )
 
-from app import blog
+from app import blog, facts
 
 # Hard caps to keep oversized inputs from blowing past column limits or
 # bloating the DB. VARCHAR(512) is the path column; UA TEXT is generous.
@@ -43,6 +43,7 @@ RATE_LIMIT_RULES = (
     ("/sitemap.xml",            60),
     ("/llms.txt",               60),
     ("/blog",                   60),
+    ("/facts",                  60),
     ("/AGENTS.md",              60),
     ("/agents.md",              60),
     ("/.well-known/agents.md",  60),
@@ -724,6 +725,49 @@ async def blog_post(request: Request, slug: str):
     if _wants_markdown(request.headers.get("accept", "")):
         return Response(content=post.md, media_type="text/markdown; charset=utf-8")
     return HTMLResponse(content=blog.render_post_html(post))
+
+
+# ── Grounding pages ────────────────────────────────────────────────────────────
+
+# Grounding pages are factual entity definitions (see app/facts.py). Unlike the
+# blog, reads ARE logged — they are a positive discovery signal, exactly like
+# agents.md: an agent fetching a citable fact source, the opposite of a honeypot
+# violation. Each page is logged under its exact path so individual pages are
+# distinguishable in the data.
+
+@app.get("/facts")
+async def facts_index(request: Request):
+    ip = request.client.host
+    ua = request.headers.get("user-agent", "")
+    if _should_log_meta_visit("/facts", ua):
+        await log_visit(
+            app.state.db_pool, "/facts", ua, ip, is_honeypot=False,
+            signature_status=request.state.signature_status,
+        )
+    if _wants_markdown(request.headers.get("accept", "")):
+        return Response(
+            content=facts.render_index_markdown(),
+            media_type="text/markdown; charset=utf-8",
+        )
+    return HTMLResponse(content=facts.render_index_html())
+
+
+@app.get("/facts/{slug}")
+async def facts_page(request: Request, slug: str):
+    fact = facts.get_fact(slug)
+    if fact is None:
+        return PlainTextResponse("Not Found", status_code=404)
+    path = request.url.path
+    ip = request.client.host
+    ua = request.headers.get("user-agent", "")
+    if _should_log_meta_visit(path, ua):
+        await log_visit(
+            app.state.db_pool, path, ua, ip, is_honeypot=False,
+            signature_status=request.state.signature_status,
+        )
+    if _wants_markdown(request.headers.get("accept", "")):
+        return Response(content=fact.md, media_type="text/markdown; charset=utf-8")
+    return HTMLResponse(content=facts.render_fact_html(fact))
 
 
 # ── Honeypot endpoints ───────────────────────────────────────────────────────
