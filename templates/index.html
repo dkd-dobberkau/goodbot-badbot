@@ -654,7 +654,7 @@
 </div>
 
 <section class="discovery-section">
-  <div class="panel-title">Discovery Reads — who fetches llms.txt &amp; agents.md</div>
+  <div class="panel-title">Discovery Reads — who fetches llms.txt, agents.md &amp; grounding pages</div>
   <p class="discovery-intro">
     These files are <strong>invitations</strong>, not traps:
     <code>/llms.txt</code> is the LLM-oriented site summary, and
@@ -672,12 +672,13 @@
         <th>Operator</th>
         <th style="text-align:right">llms.txt</th>
         <th style="text-align:right">agents.md</th>
+        <th style="text-align:right">grounding</th>
         <th style="text-align:right">Total</th>
         <th style="text-align:right">Last read</th>
       </tr>
     </thead>
     <tbody id="discoveryTable">
-      <tr><td colspan="6" class="empty-state">Loading…</td></tr>
+      <tr><td colspan="7" class="empty-state">Loading…</td></tr>
     </tbody>
   </table>
 </section>
@@ -787,11 +788,12 @@ function renderStats(data) {
   const discTable = document.getElementById('discoveryTable');
   const discovery = data.discovery_reads || [];
   if (discovery.length === 0) {
-    discTable.innerHTML = `<tr><td colspan="6" class="empty-state">No discovery reads logged yet.</td></tr>`;
+    discTable.innerHTML = `<tr><td colspan="7" class="empty-state">No discovery reads logged yet.</td></tr>`;
   } else {
     discTable.innerHTML = discovery.map(row => {
       const llms = Number(row.llms_reads) || 0;
       const agents = Number(row.agents_reads) || 0;
+      const facts = Number(row.facts_reads) || 0;
       const total = Number(row.total_reads) || 0;
       const cell = (n) => `<td class="read-count ${n > 0 ? 'nonzero' : 'zero'}">${n > 0 ? n : '—'}</td>`;
       const lastRead = row.last_seen
@@ -802,6 +804,7 @@ function renderStats(data) {
         <td><span class="operator">${esc(row.operator)}</span></td>
         ${cell(llms)}
         ${cell(agents)}
+        ${cell(facts)}
         <td class="read-count nonzero">${total}</td>
         <td class="last-seen">${esc(lastRead)}</td>
       </tr>`;

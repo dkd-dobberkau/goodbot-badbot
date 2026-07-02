@@ -861,10 +861,11 @@ async def _compute_stats() -> dict:
                 SELECT bot_name, operator,
                        CAST(SUM(path = '/llms.txt') AS UNSIGNED) AS llms_reads,
                        CAST(SUM(path IN ({agents_ph})) AS UNSIGNED) AS agents_reads,
+                       CAST(SUM(path = '/facts' OR path LIKE '/facts/%%') AS UNSIGNED) AS facts_reads,
                        COUNT(*) AS total_reads,
                        MAX(ts) AS last_seen
                 FROM visits
-                WHERE path IN ({discovery_ph})
+                WHERE (path IN ({discovery_ph}) OR path = '/facts' OR path LIKE '/facts/%%')
                   AND bot_name IS NOT NULL
                 GROUP BY bot_name, operator
                 ORDER BY total_reads DESC, last_seen DESC
@@ -875,7 +876,8 @@ async def _compute_stats() -> dict:
             discovery = await cur.fetchall()
 
             await cur.execute(
-                f"SELECT COUNT(*) AS c FROM visits WHERE path IN ({discovery_ph})",
+                f"SELECT COUNT(*) AS c FROM visits "
+                f"WHERE path IN ({discovery_ph}) OR path = '/facts' OR path LIKE '/facts/%%'",
                 DISCOVERY_PATHS,
             )
             total_discovery = (await cur.fetchone())["c"]
