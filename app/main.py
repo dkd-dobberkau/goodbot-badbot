@@ -858,16 +858,16 @@ async def _compute_stats() -> dict:
             discovery_ph = ",".join(["%s"] * len(DISCOVERY_PATHS))
             await cur.execute(
                 f"""
-                SELECT bot_name, operator,
+                SELECT COALESCE(bot_name, 'Unidentified') AS bot_name,
+                       COALESCE(operator, '—') AS operator,
                        CAST(SUM(path = '/llms.txt') AS UNSIGNED) AS llms_reads,
                        CAST(SUM(path IN ({agents_ph})) AS UNSIGNED) AS agents_reads,
                        CAST(SUM(path = '/facts' OR path LIKE '/facts/%%') AS UNSIGNED) AS facts_reads,
                        COUNT(*) AS total_reads,
                        MAX(ts) AS last_seen
                 FROM visits
-                WHERE (path IN ({discovery_ph}) OR path = '/facts' OR path LIKE '/facts/%%')
-                  AND bot_name IS NOT NULL
-                GROUP BY bot_name, operator
+                WHERE path IN ({discovery_ph}) OR path = '/facts' OR path LIKE '/facts/%%'
+                GROUP BY COALESCE(bot_name, 'Unidentified'), COALESCE(operator, '—')
                 ORDER BY total_reads DESC, last_seen DESC
                 LIMIT 50
                 """,
