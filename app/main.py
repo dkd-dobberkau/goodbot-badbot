@@ -535,6 +535,14 @@ def _build_sitemap() -> str:
         urls.append(
             f"  <url>\n    <loc>{SITE_BASE_URL}/blog/{post.slug}</loc>\n    <lastmod>{lastmod}</lastmod>\n  </url>"
         )
+    urls.append(
+        f"  <url>\n    <loc>{SITE_BASE_URL}/facts</loc>\n    <lastmod>{SITEMAP_LASTMOD}</lastmod>\n  </url>"
+    )
+    for fact in facts.list_facts():
+        lastmod = fact.date_modified or SITEMAP_LASTMOD
+        urls.append(
+            f"  <url>\n    <loc>{SITE_BASE_URL}/facts/{fact.slug}</loc>\n    <lastmod>{lastmod}</lastmod>\n  </url>"
+        )
     body = "\n".join(urls)
     return (
         '<?xml version="1.0" encoding="UTF-8"?>\n'
@@ -607,6 +615,13 @@ trips a honeypot, where its visit is recorded.
 - [Public dashboard](https://goodbot-badbot.com/): per-bot scoreboard and live violation feed
 - [JSON stats](https://goodbot-badbot.com/api/stats): machine-readable summary
 - [robots.txt](https://goodbot-badbot.com/robots.txt): the honeypot rules
+
+## Grounding pages
+
+Factual, machine-readable entity definitions for AI systems to cite:
+
+- [goodbot-badbot](https://goodbot-badbot.com/facts/goodbot-badbot): the experiment as a dataset
+- [robots.txt compliance](https://goodbot-badbot.com/facts/robots-txt-compliance): the measured concept
 
 ## Honeypot paths
 
@@ -934,6 +949,7 @@ async def favicon():
 HOMEPAGE_LINK_HEADER = ", ".join((
     '</api/stats>; rel="service-desc"; type="application/json"',
     '</llms.txt>; rel="service-doc"; type="text/markdown"',
+    '</facts>; rel="describedby"; type="text/html"',
     '</sitemap.xml>; rel="sitemap"',
 ))
 
