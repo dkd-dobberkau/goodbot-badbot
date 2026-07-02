@@ -63,3 +63,11 @@ of a honeypot violation. You can watch which crawlers fetch them in the
 
 So the site now offers agents something true to cite — and, true to form,
 writes down who takes it up on the offer.
+
+## Sources and further reading
+
+- [The Grounding Page Standard](https://groundingpage.com/facts/grounding-page-standard/) — the editorial rule set this post draws on (a GEO discipline, not a formal standard).
+- [Grounding vs llms.txt](https://www.runoctopus.com/glossary/grounding/grounding-vs-llms-txt.html) — the retrieval-pool-versus-inference distinction, spelled out.
+- [llms.txt](https://llmstxt.org/) — Jeremy Howard's original proposal for the LLM-oriented site summary.
+- [schema.org/Dataset](https://schema.org/Dataset) and [schema.org/DefinedTerm](https://schema.org/DefinedTerm) — the two vocabulary types our grounding pages emit as JSON-LD.
+- [RFC 9309](https://www.rfc-editor.org/rfc/rfc9309.html) — the Robots Exclusion Protocol, the standard behind the compliance we measure.
