@@ -192,7 +192,7 @@ def _jsonld_head(fact: Fact) -> str:
 
 def render_fact_html(fact: Fact) -> str:
     content = (
-        '<main class="article">'
+        '<main class="article" id="main">'
         '<a class="back-link" href="/facts">← all grounding pages</a>'
         f'<h1 class="article-title">{_html.escape(fact.title)}</h1>'
         f'<div class="article-date">Last updated {_html.escape(fact.date_modified)}</div>'
@@ -223,7 +223,7 @@ def render_index_html() -> str:
         'without guessing. Reads are logged as a discovery signal.</p>'
     )
     content = (
-        f'<main class="article"><h1 class="article-title">Grounding pages</h1>'
+        f'<main class="article" id="main"><h1 class="article-title">Grounding pages</h1>'
         f'{intro}{items}</main>'
     )
     return _page("Grounding pages", content)

@@ -4,8 +4,6 @@ date: 2026-07-02
 summary: We published two grounding pages — factual, machine-readable entity definitions — and made every read a measurement signal. Here is what they are, and why they are not compliance theatre.
 ---
 
-# Grounding pages — something true to cite
-
 This site already speaks several dialects of "please read me correctly" to AI
 systems: a `robots.txt` with Content Signals, an `llms.txt` summary, an
 `agents.md` probe surface, and Web Bot Auth keys. This week it learned one

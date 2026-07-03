@@ -153,13 +153,13 @@ def render_index_html() -> str:
             for p in posts
         )
         items = f'<ul class="post-list">{rows}</ul>'
-    content = f'<main class="article"><h1 class="article-title">Writing</h1>{items}</main>'
+    content = f'<main class="article" id="main"><h1 class="article-title">Writing</h1>{items}</main>'
     return _page("Writing", content)
 
 
 def render_post_html(post: Post) -> str:
     content = (
-        '<main class="article">'
+        '<main class="article" id="main">'
         '<a class="back-link" href="/blog">← all posts</a>'
         f'<h1 class="article-title">{_html.escape(post.title)}</h1>'
         f'<div class="article-date">{_html.escape(post.date)}</div>'
