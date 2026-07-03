@@ -23,11 +23,12 @@
     --green: #00ff87;
     --red: #ff3b3b;
     --yellow: #ffd166;
-    --dim: #444;
+    --dim: #7a7a7a;
     --text: #e8e8e8;
-    --muted: #666;
-    --code-text: #555;
-    --code-comment: #333;
+    --muted: #8a8a8a;
+    --code-text: #8a8a8a;
+    --code-comment: #7a7a7a;
+    --code-agent: #ffd166;
     --verdict-bad-bg: rgba(255,59,59,0.1);
     --verdict-bad-border: rgba(255,59,59,0.2);
     --verdict-good-bg: rgba(0,255,135,0.08);
@@ -39,14 +40,15 @@
     --surface: #ffffff;
     --border: #e2e2e2;
     --row-border: #efefef;
-    --green: #00a05a;
+    --green: #007a43;
     --red: #d8261f;
     --yellow: #b07a00;
-    --dim: #bcbcbc;
+    --dim: #6f6f6f;
     --text: #161616;
     --muted: #6a6a6a;
-    --code-text: #7a7a7a;
-    --code-comment: #b8b8b8;
+    --code-text: #6f6f6f;
+    --code-comment: #6f6f6f;
+    --code-agent: #8a6d00;
     --verdict-bad-bg: rgba(216,38,31,0.08);
     --verdict-bad-border: rgba(216,38,31,0.25);
     --verdict-good-bg: rgba(0,160,90,0.08);
@@ -67,6 +69,37 @@
     min-height: 100vh;
     overflow-x: hidden;
     transition: background 0.2s ease, color 0.2s ease;
+  }
+
+  /* ACCESSIBILITY HELPERS */
+  .sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .skip-link {
+    position: absolute;
+    left: 0.5rem;
+    top: -3rem;
+    z-index: 100;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    padding: 0.6rem 1rem;
+    border-radius: 2px;
+    text-decoration: none;
+    transition: top 0.15s ease;
+  }
+
+  .skip-link:focus {
+    top: 0.5rem;
   }
 
   /* HEADER */
@@ -387,7 +420,7 @@
 
   .robots-content .disallow { color: var(--red); }
   .robots-content .comment  { color: var(--code-comment); }
-  .robots-content .agent    { color: var(--yellow); }
+  .robots-content .agent    { color: var(--code-agent); }
 
   /* VISIBLE TRAP SECTION */
   .trap-box {
@@ -543,6 +576,8 @@
 </head>
 <body>
 
+<a class="skip-link" href="#main">Skip to main content</a>
+
 <header>
   <div class="logo">
     <span class="good">good</span><span class="sep">·</span><span class="bad">bad</span><span style="color:var(--muted)">bot</span>
@@ -561,6 +596,8 @@
     <div class="live-dot">monitoring</div>
   </div>
 </header>
+
+<main id="main">
 
 <section class="hero">
   <h1>
@@ -591,16 +628,16 @@
 
 <div class="main-grid">
   <div class="panel">
-    <div class="panel-title">Bot Compliance Scoreboard</div>
-    <table>
+    <h2 class="panel-title" id="scoreboard-title">Bot Compliance Scoreboard</h2>
+    <table aria-labelledby="scoreboard-title">
       <thead>
         <tr>
-          <th>Bot</th>
-          <th>Operator</th>
-          <th>Verdict</th>
-          <th style="text-align:right">Signed</th>
-          <th style="text-align:right">Violations</th>
-          <th style="text-align:right">Visits</th>
+          <th scope="col">Bot</th>
+          <th scope="col">Operator</th>
+          <th scope="col">Verdict</th>
+          <th scope="col" style="text-align:right">Signed</th>
+          <th scope="col" style="text-align:right">Violations</th>
+          <th scope="col" style="text-align:right">Visits</th>
         </tr>
       </thead>
       <tbody id="botTable">
@@ -646,15 +683,15 @@
   </div>
 
   <div class="feed-panel">
-    <div class="panel-title">Live Violation Feed</div>
-    <div id="violationFeed">
+    <h2 class="panel-title" id="feed-title">Live Violation Feed</h2>
+    <div id="violationFeed" aria-live="polite" aria-labelledby="feed-title">
       <div class="empty-state">No violations logged yet.</div>
     </div>
   </div>
 </div>
 
 <section class="discovery-section">
-  <div class="panel-title">Discovery Reads — who fetches llms.txt, agents.md &amp; grounding pages</div>
+  <h2 class="panel-title" id="discovery-title">Discovery Reads — who fetches llms.txt, agents.md &amp; grounding pages</h2>
   <p class="discovery-intro">
     These files are <strong>invitations</strong>, not traps:
     <code>/llms.txt</code> is the LLM-oriented site summary, and
@@ -665,16 +702,16 @@
     deliberately doing discovery. So far <strong id="discoveryTotal">—</strong>
     discovery reads have been logged.
   </p>
-  <table>
+  <table aria-labelledby="discovery-title">
     <thead>
       <tr>
-        <th>Bot</th>
-        <th>Operator</th>
-        <th style="text-align:right">llms.txt</th>
-        <th style="text-align:right">agents.md</th>
-        <th style="text-align:right">grounding</th>
-        <th style="text-align:right">Total</th>
-        <th style="text-align:right">Last read</th>
+        <th scope="col">Bot</th>
+        <th scope="col">Operator</th>
+        <th scope="col" style="text-align:right">llms.txt</th>
+        <th scope="col" style="text-align:right">agents.md</th>
+        <th scope="col" style="text-align:right">grounding</th>
+        <th scope="col" style="text-align:right">Total</th>
+        <th scope="col" style="text-align:right">Last read</th>
       </tr>
     </thead>
     <tbody id="discoveryTable">
@@ -683,9 +720,11 @@
   </table>
 </section>
 
+</main>
+
 <footer>
   <span>goodbot-badbot.com — personal experiment by Olivier Dobberkau · <a href="/blog">blog</a> · <a href="/facts">facts</a> · <a href="https://github.com/dkd-dobberkau/goodbot-badbot" target="_blank" rel="noopener noreferrer">source on GitHub</a></span>
-  <span id="lastUpdate">—</span>
+  <span id="lastUpdate" aria-live="polite">—</span>
 </footer>
 
 <script>
