@@ -47,6 +47,8 @@ RATE_LIMIT_RULES = (
     ("/AGENTS.md",              60),
     ("/agents.md",              60),
     ("/.well-known/agents.md",  60),
+    ("/.well-known/api-catalog", 60),
+    ("/openapi.json",           60),
     ("/.well-known/http-message-signatures-directory", 60),
     ("/do-not-crawl",           30),
     ("/private",                30),
@@ -174,6 +176,13 @@ HONEYPOT_PATHS = [
 AGENTS_MD_PATHS = ("/AGENTS.md", "/agents.md", "/.well-known/agents.md")
 DISCOVERY_PATHS = ("/llms.txt", *AGENTS_MD_PATHS)
 
+# API-catalog surface (RFC 9264 linkset + its OpenAPI description). Reads here
+# are a third, distinct Discovery signal: not "did the bot read a hint" but
+# "did the bot use the explicitly offered machine interface instead of
+# scraping". It is an OFFER, not a rule — ignoring it is never a violation —
+# so these paths feed Discovery Reads only, never the honeypot/verdict logic.
+API_CATALOG_PATHS = ("/.well-known/api-catalog", "/openapi.json")
+
 
 DB_CONFIG = {
     "host":     os.getenv("MYSQL_HOST", "127.0.0.1"),
@@ -283,7 +292,13 @@ async def lifespan(app: FastAPI):
     await pool.wait_closed()
 
 
-app = FastAPI(lifespan=lifespan)
+# docs_url/redoc_url disabled: the Swagger/ReDoc UIs load their assets from a
+# CDN, which our CSP (script-src 'self') blocks — the pages would be broken.
+# openapi_url disabled so we register /openapi.json ourselves and can log reads
+# of it as an API-catalog Discovery signal (app.openapi() still builds the
+# schema on demand). Honeypot routes are kept out of the schema via
+# include_in_schema=False so the catalog never frames a trap as a real endpoint.
+app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/vendor", StaticFiles(directory="vendor"), name="vendor")
 
 
@@ -594,6 +609,71 @@ async def web_bot_auth_directory():
     )
 
 
+# ── /.well-known/api-catalog (RFC 9264 linkset) ──────────────────────────────
+
+# Advertise the one genuinely useful machine endpoint this site has —
+# /api/stats — plus its OpenAPI description, so an agent can discover the
+# public data API from a well-known path instead of scraping the dashboard
+# HTML. Built as a pure function of the base URL so it stays trivially
+# testable and never accidentally lists a honeypot path.
+def build_api_catalog(base_url: str) -> dict:
+    return {
+        "linkset": [
+            {
+                "anchor": f"{base_url}/",
+                "service-desc": [
+                    {
+                        "href": f"{base_url}/openapi.json",
+                        "type": "application/vnd.oai.openapi+json",
+                    }
+                ],
+                "service-doc": [
+                    {"href": f"{base_url}/llms.txt", "type": "text/markdown"}
+                ],
+                "item": [
+                    {
+                        "href": f"{base_url}/api/stats",
+                        "type": "application/json",
+                        "title": "Live robots.txt-compliance statistics",
+                    }
+                ],
+            }
+        ]
+    }
+
+
+@app.get("/.well-known/api-catalog", include_in_schema=False)
+async def api_catalog(request: Request):
+    ip = request.client.host
+    ua = request.headers.get("user-agent", "")
+    if _should_log_meta_visit("/.well-known/api-catalog", ua):
+        await log_visit(
+            app.state.db_pool, "/.well-known/api-catalog", ua, ip, is_honeypot=False,
+            signature_status=request.state.signature_status,
+        )
+    return JSONResponse(
+        content=build_api_catalog(SITE_BASE_URL),
+        media_type="application/linkset+json",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+@app.get("/openapi.json", include_in_schema=False)
+async def openapi_json(request: Request):
+    ip = request.client.host
+    ua = request.headers.get("user-agent", "")
+    if _should_log_meta_visit("/openapi.json", ua):
+        await log_visit(
+            app.state.db_pool, "/openapi.json", ua, ip, is_honeypot=False,
+            signature_status=request.state.signature_status,
+        )
+    return JSONResponse(
+        content=app.openapi(),
+        media_type="application/vnd.oai.openapi+json",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
 # ── llms.txt (llmstxt.org standard) ──────────────────────────────────────────
 
 LLMS_TXT = """# goodbot-badbot
@@ -614,6 +694,7 @@ trips a honeypot, where its visit is recorded.
 
 - [Public dashboard](https://goodbot-badbot.com/): per-bot scoreboard and live violation feed
 - [JSON stats](https://goodbot-badbot.com/api/stats): machine-readable summary
+- [API catalog](https://goodbot-badbot.com/.well-known/api-catalog): RFC 9264 linkset pointing to the JSON stats API and its OpenAPI description
 - [robots.txt](https://goodbot-badbot.com/robots.txt): the honeypot rules
 
 ## Grounding pages
@@ -787,12 +868,12 @@ async def facts_page(request: Request, slug: str):
 
 # ── Honeypot endpoints ───────────────────────────────────────────────────────
 
-@app.get("/do-not-crawl/{rest:path}")
-@app.get("/private/{rest:path}")
-@app.get("/honeypot/{rest:path}")
-@app.get("/training-data-forbidden/{rest:path}")
-@app.get("/no-ai-allowed/{rest:path}")
-@app.get("/robots-test/{rest:path}")
+@app.get("/do-not-crawl/{rest:path}", include_in_schema=False)
+@app.get("/private/{rest:path}", include_in_schema=False)
+@app.get("/honeypot/{rest:path}", include_in_schema=False)
+@app.get("/training-data-forbidden/{rest:path}", include_in_schema=False)
+@app.get("/no-ai-allowed/{rest:path}", include_in_schema=False)
+@app.get("/robots-test/{rest:path}", include_in_schema=False)
 async def honeypot(request: Request, rest: str = ""):
     ip = request.client.host
     ua = request.headers.get("user-agent", "")
@@ -856,6 +937,7 @@ async def _compute_stats() -> dict:
             # the path tuples so the value list stays parameterised.
             agents_ph = ",".join(["%s"] * len(AGENTS_MD_PATHS))
             discovery_ph = ",".join(["%s"] * len(DISCOVERY_PATHS))
+            catalog_ph = ",".join(["%s"] * len(API_CATALOG_PATHS))
             await cur.execute(
                 f"""
                 SELECT COALESCE(bot_name, 'Unidentified') AS bot_name,
@@ -863,22 +945,25 @@ async def _compute_stats() -> dict:
                        CAST(SUM(path = '/llms.txt') AS UNSIGNED) AS llms_reads,
                        CAST(SUM(path IN ({agents_ph})) AS UNSIGNED) AS agents_reads,
                        CAST(SUM(path = '/facts' OR path LIKE '/facts/%%') AS UNSIGNED) AS facts_reads,
+                       CAST(SUM(path IN ({catalog_ph})) AS UNSIGNED) AS catalog_reads,
                        COUNT(*) AS total_reads,
                        MAX(ts) AS last_seen
                 FROM visits
                 WHERE path IN ({discovery_ph}) OR path = '/facts' OR path LIKE '/facts/%%'
+                   OR path IN ({catalog_ph})
                 GROUP BY COALESCE(bot_name, 'Unidentified'), COALESCE(operator, '—')
                 ORDER BY total_reads DESC, last_seen DESC
                 LIMIT 50
                 """,
-                (*AGENTS_MD_PATHS, *DISCOVERY_PATHS),
+                (*AGENTS_MD_PATHS, *API_CATALOG_PATHS, *DISCOVERY_PATHS, *API_CATALOG_PATHS),
             )
             discovery = await cur.fetchall()
 
             await cur.execute(
                 f"SELECT COUNT(*) AS c FROM visits "
-                f"WHERE path IN ({discovery_ph}) OR path = '/facts' OR path LIKE '/facts/%%'",
-                DISCOVERY_PATHS,
+                f"WHERE path IN ({discovery_ph}) OR path = '/facts' OR path LIKE '/facts/%%' "
+                f"OR path IN ({catalog_ph})",
+                (*DISCOVERY_PATHS, *API_CATALOG_PATHS),
             )
             total_discovery = (await cur.fetchone())["c"]
 
@@ -920,7 +1005,7 @@ async def stats(response: Response):
 BUILD_VERSION = os.getenv("BUILD_VERSION", "unknown")
 
 
-@app.get("/api/version")
+@app.get("/api/version", include_in_schema=False)
 async def version(response: Response):
     response.headers["Cache-Control"] = "no-store"
     return {"version": BUILD_VERSION}
@@ -935,7 +1020,7 @@ FAVICON_SVG = (
 )
 
 
-@app.get("/favicon.ico")
+@app.get("/favicon.ico", include_in_schema=False)
 async def favicon():
     return Response(
         content=FAVICON_SVG,
@@ -952,6 +1037,7 @@ HOMEPAGE_LINK_HEADER = ", ".join((
     '</api/stats>; rel="service-desc"; type="application/json"',
     '</llms.txt>; rel="service-doc"; type="text/markdown"',
     '</facts>; rel="describedby"; type="text/html"',
+    '</.well-known/api-catalog>; rel="api-catalog"; type="application/linkset+json"',
     '</sitemap.xml>; rel="sitemap"',
 ))
 

@@ -691,13 +691,16 @@
 </div>
 
 <section class="discovery-section">
-  <h2 class="panel-title" id="discovery-title">Discovery Reads — who fetches llms.txt, agents.md &amp; grounding pages</h2>
+  <h2 class="panel-title" id="discovery-title">Discovery Reads — who fetches llms.txt, agents.md, grounding pages &amp; the API catalog</h2>
   <p class="discovery-intro">
     These files are <strong>invitations</strong>, not traps:
     <code>/llms.txt</code> is the LLM-oriented site summary, and
     <code>/agents.md</code> (served at <code>/AGENTS.md</code>,
     <code>/agents.md</code> and <code>/.well-known/agents.md</code>) is a
-    probe surface for agents that look for usage instructions. Reading them is
+    probe surface for agents that look for usage instructions. The
+    <code>/.well-known/api-catalog</code> goes one step further: it offers a
+    machine-readable description of the JSON stats API, so an agent can use the
+    interface instead of scraping this page. Reading any of them is
     <strong>not a violation</strong> — it is the opposite signal: an agent
     deliberately doing discovery. So far <strong id="discoveryTotal">—</strong>
     discovery reads have been logged.
@@ -710,12 +713,13 @@
         <th scope="col" style="text-align:right">llms.txt</th>
         <th scope="col" style="text-align:right">agents.md</th>
         <th scope="col" style="text-align:right">grounding</th>
+        <th scope="col" style="text-align:right">api catalog</th>
         <th scope="col" style="text-align:right">Total</th>
         <th scope="col" style="text-align:right">Last read</th>
       </tr>
     </thead>
     <tbody id="discoveryTable">
-      <tr><td colspan="7" class="empty-state">Loading…</td></tr>
+      <tr><td colspan="8" class="empty-state">Loading…</td></tr>
     </tbody>
   </table>
 </section>
@@ -827,12 +831,13 @@ function renderStats(data) {
   const discTable = document.getElementById('discoveryTable');
   const discovery = data.discovery_reads || [];
   if (discovery.length === 0) {
-    discTable.innerHTML = `<tr><td colspan="7" class="empty-state">No discovery reads logged yet.</td></tr>`;
+    discTable.innerHTML = `<tr><td colspan="8" class="empty-state">No discovery reads logged yet.</td></tr>`;
   } else {
     discTable.innerHTML = discovery.map(row => {
       const llms = Number(row.llms_reads) || 0;
       const agents = Number(row.agents_reads) || 0;
       const facts = Number(row.facts_reads) || 0;
+      const catalog = Number(row.catalog_reads) || 0;
       const total = Number(row.total_reads) || 0;
       const cell = (n) => `<td class="read-count ${n > 0 ? 'nonzero' : 'zero'}">${n > 0 ? n : '—'}</td>`;
       const lastRead = row.last_seen
@@ -844,6 +849,7 @@ function renderStats(data) {
         ${cell(llms)}
         ${cell(agents)}
         ${cell(facts)}
+        ${cell(catalog)}
         <td class="read-count nonzero">${total}</td>
         <td class="last-seen">${esc(lastRead)}</td>
       </tr>`;
