@@ -48,6 +48,7 @@ RATE_LIMIT_RULES = (
     ("/agents.md",              60),
     ("/.well-known/agents.md",  60),
     ("/.well-known/api-catalog", 60),
+    ("/.well-known/ai-catalog.json", 60),
     ("/openapi.json",           60),
     ("/.well-known/http-message-signatures-directory", 60),
     ("/do-not-crawl",           30),
@@ -182,6 +183,15 @@ DISCOVERY_PATHS = ("/llms.txt", *AGENTS_MD_PATHS)
 # scraping". It is an OFFER, not a rule — ignoring it is never a violation —
 # so these paths feed Discovery Reads only, never the honeypot/verdict logic.
 API_CATALOG_PATHS = ("/.well-known/api-catalog", "/openapi.json")
+
+# Agentic Resource Discovery (ARD) manifest. Same category as the api-catalog —
+# an offer, never a rule — but a distinct kind of offer: the RFC 9264 catalog
+# above is found by an agent that already knows this site, whereas the ARD
+# manifest is what gets the site into agent-facing registries so it can be
+# discovered in the first place. Kept as its own path/column so reads by ARD
+# registry crawlers are visible on this measurement site, rather than being
+# folded into catalog_reads. See dri.es "Agentic Resource Discovery".
+ARD_CATALOG_PATHS = ("/.well-known/ai-catalog.json",)
 
 
 DB_CONFIG = {
@@ -674,6 +684,58 @@ async def openapi_json(request: Request):
     )
 
 
+# ── /.well-known/ai-catalog.json (Agentic Resource Discovery) ────────────────
+
+# Publish an ARD manifest so agent-facing registries can index this site's one
+# machine interface and surface it to agents whose question matches. Points at
+# the same /openapi.json the api-catalog reuses. representativeQueries are the
+# intent hooks registries match against — deliberately phrased as the questions
+# this site can actually answer (robots.txt compliance by bot), not generic
+# search. Pure function of the base URL so it stays trivially testable.
+def build_ai_catalog(base_url: str) -> dict:
+    host = base_url.split("://", 1)[-1]
+    return {
+        "specVersion": "1.0",
+        "host": {"displayName": "goodbot-badbot"},
+        "entries": [
+            {
+                "identifier": f"urn:air:{host}:stats",
+                "displayName": "robots.txt compliance statistics",
+                "type": "application/openapi+json",
+                "url": f"{base_url}/openapi.json",
+                "description": (
+                    "Live statistics on which AI crawlers obey robots.txt, broken "
+                    "down by bot and operator, from a honeypot-based measurement "
+                    "site."
+                ),
+                "representativeQueries": [
+                    "Which AI crawlers ignore robots.txt?",
+                    "Show robots.txt compliance rates by bot operator",
+                    "Does GPTBot respect crawl directives?",
+                    "How many bots tripped the honeypot?",
+                    "Is a given AI crawler a good bot or a bad bot?",
+                ],
+            }
+        ],
+    }
+
+
+@app.get("/.well-known/ai-catalog.json", include_in_schema=False)
+async def ai_catalog(request: Request):
+    ip = request.client.host
+    ua = request.headers.get("user-agent", "")
+    if _should_log_meta_visit("/.well-known/ai-catalog.json", ua):
+        await log_visit(
+            app.state.db_pool, "/.well-known/ai-catalog.json", ua, ip, is_honeypot=False,
+            signature_status=request.state.signature_status,
+        )
+    return JSONResponse(
+        content=build_ai_catalog(SITE_BASE_URL),
+        media_type="application/json",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
 # ── llms.txt (llmstxt.org standard) ──────────────────────────────────────────
 
 LLMS_TXT = """# goodbot-badbot
@@ -695,6 +757,7 @@ trips a honeypot, where its visit is recorded.
 - [Public dashboard](https://goodbot-badbot.com/): per-bot scoreboard and live violation feed
 - [JSON stats](https://goodbot-badbot.com/api/stats): machine-readable summary
 - [API catalog](https://goodbot-badbot.com/.well-known/api-catalog): RFC 9264 linkset pointing to the JSON stats API and its OpenAPI description
+- [AI catalog](https://goodbot-badbot.com/.well-known/ai-catalog.json): Agentic Resource Discovery manifest so registries can index the stats API
 - [robots.txt](https://goodbot-badbot.com/robots.txt): the honeypot rules
 
 ## Grounding pages
@@ -938,6 +1001,7 @@ async def _compute_stats() -> dict:
             agents_ph = ",".join(["%s"] * len(AGENTS_MD_PATHS))
             discovery_ph = ",".join(["%s"] * len(DISCOVERY_PATHS))
             catalog_ph = ",".join(["%s"] * len(API_CATALOG_PATHS))
+            ard_ph = ",".join(["%s"] * len(ARD_CATALOG_PATHS))
             await cur.execute(
                 f"""
                 SELECT COALESCE(bot_name, 'Unidentified') AS bot_name,
@@ -946,24 +1010,26 @@ async def _compute_stats() -> dict:
                        CAST(SUM(path IN ({agents_ph})) AS UNSIGNED) AS agents_reads,
                        CAST(SUM(path = '/facts' OR path LIKE '/facts/%%') AS UNSIGNED) AS facts_reads,
                        CAST(SUM(path IN ({catalog_ph})) AS UNSIGNED) AS catalog_reads,
+                       CAST(SUM(path IN ({ard_ph})) AS UNSIGNED) AS ard_reads,
                        COUNT(*) AS total_reads,
                        MAX(ts) AS last_seen
                 FROM visits
                 WHERE path IN ({discovery_ph}) OR path = '/facts' OR path LIKE '/facts/%%'
-                   OR path IN ({catalog_ph})
+                   OR path IN ({catalog_ph}) OR path IN ({ard_ph})
                 GROUP BY COALESCE(bot_name, 'Unidentified'), COALESCE(operator, '—')
                 ORDER BY total_reads DESC, last_seen DESC
                 LIMIT 50
                 """,
-                (*AGENTS_MD_PATHS, *API_CATALOG_PATHS, *DISCOVERY_PATHS, *API_CATALOG_PATHS),
+                (*AGENTS_MD_PATHS, *API_CATALOG_PATHS, *ARD_CATALOG_PATHS,
+                 *DISCOVERY_PATHS, *API_CATALOG_PATHS, *ARD_CATALOG_PATHS),
             )
             discovery = await cur.fetchall()
 
             await cur.execute(
                 f"SELECT COUNT(*) AS c FROM visits "
                 f"WHERE path IN ({discovery_ph}) OR path = '/facts' OR path LIKE '/facts/%%' "
-                f"OR path IN ({catalog_ph})",
-                (*DISCOVERY_PATHS, *API_CATALOG_PATHS),
+                f"OR path IN ({catalog_ph}) OR path IN ({ard_ph})",
+                (*DISCOVERY_PATHS, *API_CATALOG_PATHS, *ARD_CATALOG_PATHS),
             )
             total_discovery = (await cur.fetchone())["c"]
 
@@ -1038,6 +1104,7 @@ HOMEPAGE_LINK_HEADER = ", ".join((
     '</llms.txt>; rel="service-doc"; type="text/markdown"',
     '</facts>; rel="describedby"; type="text/html"',
     '</.well-known/api-catalog>; rel="api-catalog"; type="application/linkset+json"',
+    '</.well-known/ai-catalog.json>; rel="ai-catalog"; type="application/json"',
     '</sitemap.xml>; rel="sitemap"',
 ))
 
