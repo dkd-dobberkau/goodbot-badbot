@@ -711,7 +711,17 @@
     measurement. Reading or calling any of them is
     <strong>not a violation</strong> — it is the opposite signal: an agent
     deliberately doing discovery. So far <strong id="discoveryTotal">—</strong>
-    discovery reads have been logged.
+    discovery reads have been logged, plus
+    <strong id="probeTotal">—</strong> HEAD probes.
+  </p>
+  <p class="discovery-intro">
+    <strong>Reads vs. probes.</strong> A <code>HEAD</code> request asks whether
+    a file exists without taking the bytes — a crawler checking freshness or
+    testing the waters, not consuming the content. Those are counted separately
+    in the <em>head probes</em> column and are excluded from every per-surface
+    read count, so the two are never conflated. Note that until August 2026
+    this site answered <code>HEAD</code> with <code>405</code> everywhere, so
+    the probe column necessarily starts empty.
   </p>
   <table aria-labelledby="discovery-title">
     <thead>
@@ -724,12 +734,13 @@
         <th scope="col" style="text-align:right">api catalog</th>
         <th scope="col" style="text-align:right">ai catalog</th>
         <th scope="col" style="text-align:right">mcp calls</th>
-        <th scope="col" style="text-align:right">Total</th>
+        <th scope="col" style="text-align:right">head probes</th>
+        <th scope="col" style="text-align:right">Total reads</th>
         <th scope="col" style="text-align:right">Last read</th>
       </tr>
     </thead>
     <tbody id="discoveryTable">
-      <tr><td colspan="10" class="empty-state">Loading…</td></tr>
+      <tr><td colspan="11" class="empty-state">Loading…</td></tr>
     </tbody>
   </table>
 </section>
@@ -827,21 +838,29 @@ function renderStats(data) {
       let sigBadge = '';
       if (v.signature_status === 'verified') sigBadge = `<span class="sig-badge verified">signed ✓</span>`;
       else if (v.signature_status === 'failed') sigBadge = `<span class="sig-badge failed">sig fail</span>`;
+      // GET is the overwhelming default and stays unlabelled; anything else
+      // (a HEAD probe of a Disallow'd path) is worth calling out.
+      const method = String(v.method || 'GET').toUpperCase();
+      const methodBadge = method === 'GET'
+        ? ''
+        : `<span class="link-badge via-guess">${esc(method)}</span>`;
       return `<div class="feed-item">
         <div class="feed-time">${ts}</div>
         <div class="feed-bot">${esc(v.bot_name || 'Unknown')} · ${esc(v.operator || '?')}${sigBadge}</div>
-        <div class="feed-path">${linkBadge}${esc(v.path)}</div>
+        <div class="feed-path">${linkBadge}${methodBadge}${esc(v.path)}</div>
       </div>`;
     }).join('');
   }
 
   document.getElementById('discoveryTotal').textContent =
     (data.total_discovery_reads || 0).toLocaleString();
+  document.getElementById('probeTotal').textContent =
+    (data.total_head_probes || 0).toLocaleString();
 
   const discTable = document.getElementById('discoveryTable');
   const discovery = data.discovery_reads || [];
   if (discovery.length === 0) {
-    discTable.innerHTML = `<tr><td colspan="10" class="empty-state">No discovery reads logged yet.</td></tr>`;
+    discTable.innerHTML = `<tr><td colspan="11" class="empty-state">No discovery reads logged yet.</td></tr>`;
   } else {
     discTable.innerHTML = discovery.map(row => {
       const llms = Number(row.llms_reads) || 0;
@@ -850,6 +869,7 @@ function renderStats(data) {
       const catalog = Number(row.catalog_reads) || 0;
       const ard = Number(row.ard_reads) || 0;
       const mcpCalls = Number(row.mcp_calls) || 0;
+      const probes = Number(row.head_probes) || 0;
       const total = Number(row.total_reads) || 0;
       const cell = (n) => `<td class="read-count ${n > 0 ? 'nonzero' : 'zero'}">${n > 0 ? n : '—'}</td>`;
       const lastRead = row.last_seen
@@ -864,6 +884,7 @@ function renderStats(data) {
         ${cell(catalog)}
         ${cell(ard)}
         ${cell(mcpCalls)}
+        ${cell(probes)}
         <td class="read-count nonzero">${total}</td>
         <td class="last-seen">${esc(lastRead)}</td>
       </tr>`;

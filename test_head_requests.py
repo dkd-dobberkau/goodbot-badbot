@@ -15,11 +15,12 @@ from fastapi.testclient import TestClient
 
 from app import main
 
-logged: list[tuple[str, bool]] = []
+logged: list[tuple[str, bool, str | None]] = []
 
 
-async def fake_log_visit(pool, path, ua, ip, *, is_honeypot=False, signature_status=None):
-    logged.append((path, is_honeypot))
+async def fake_log_visit(pool, path, ua, ip, *, is_honeypot=False, signature_status=None,
+                         method=None):
+    logged.append((path, is_honeypot, method))
 
 
 async def fake_stats():
@@ -81,18 +82,34 @@ def main_() -> int:
         check(f"GET {path} still 200 with a body",
               r.status_code == 200 and bool(r.content), str(r.status_code))
 
-    # The point of the fix: a HEAD to a Disallow'd path is still a violation.
+    # The point of the fix: a HEAD to a Disallow'd path is still a violation,
+    # and the method is recorded so the feed can label it.
     logged.clear()
     r = client.head(HONEYPOT_PATH, headers={"User-Agent": "sneaky-head-bot/1.0"})
     check("HEAD on a honeypot -> 200 (not 405)", r.status_code == 200, str(r.status_code))
-    check("HEAD on a honeypot is logged as a violation",
-          logged == [(HONEYPOT_PATH, True)], str(logged))
+    check("HEAD on a honeypot is logged as a violation with method",
+          logged == [(HONEYPOT_PATH, True, "HEAD")], str(logged))
 
-    # A discovery file probed with HEAD is logged like any other read.
+    # Every logged visit carries the method that produced it.
     logged.clear()
-    client.head("/llms.txt", headers={"User-Agent": "head-discovery-bot/1.0"})
-    check("HEAD on llms.txt is logged as a discovery read",
-          logged == [("/llms.txt", False)], str(logged))
+    client.get("/llms.txt", headers={"User-Agent": "method-bot/1.0"})
+    check("GET records method=GET", logged == [("/llms.txt", False, "GET")], str(logged))
+
+    # Dedup is keyed on method: a bot that HEAD-probes a file and then GETs it
+    # within the TTL must produce BOTH rows, or the probe would silently
+    # swallow the read (and the whole read/probe split would be a lie).
+    logged.clear()
+    main._visit_dedup.clear()
+    ua = {"User-Agent": "probe-then-read-bot/1.0"}
+    client.head("/llms.txt", headers=ua)
+    client.get("/llms.txt", headers=ua)
+    check("HEAD then GET on the same path logs both",
+          logged == [("/llms.txt", False, "HEAD"), ("/llms.txt", False, "GET")], str(logged))
+
+    # ...but a repeat of the same method within the TTL is still deduped.
+    logged.clear()
+    client.get("/llms.txt", headers=ua)
+    check("repeat GET within the TTL is still deduped", logged == [], str(logged))
 
     # POST-only routes must NOT have gained HEAD.
     r = client.head("/mcp", headers={"User-Agent": "head-probe-mcp"})

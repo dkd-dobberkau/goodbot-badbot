@@ -228,26 +228,35 @@ CREATE TABLE IF NOT EXISTS visits (
     ip_hash          CHAR(16),
     is_honeypot      TINYINT(1) NOT NULL DEFAULT 0,
     signature_status VARCHAR(16) NULL,
+    method           VARCHAR(8) NULL,
     KEY idx_visits_bot_name (bot_name),
     KEY idx_visits_is_honeypot_ts (is_honeypot, ts)
 ) ENGINE=InnoDB CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
 """
 
-# MySQL has no ADD COLUMN IF NOT EXISTS, so probe information_schema before
-# attempting the ALTER. This is the idempotent way to evolve the schema for
-# DBs that pre-date the column (the production DB volume persists across
-# deploys; fresh dev DBs get the column via SCHEMA above).
-async def _ensure_signature_status_column(cur):
-    await cur.execute(
-        """
-        SELECT COUNT(*) FROM information_schema.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = 'visits'
-          AND COLUMN_NAME = 'signature_status'
-        """
-    )
-    if (await cur.fetchone())[0] == 0:
-        await cur.execute("ALTER TABLE visits ADD COLUMN signature_status VARCHAR(16) NULL")
+# Columns added after the table first shipped. MySQL has no ADD COLUMN IF NOT
+# EXISTS, so probe information_schema before attempting each ALTER — the
+# production DB volume persists across deploys, while fresh dev DBs get the
+# columns from SCHEMA above and skip every ALTER.
+ADDED_COLUMNS = (
+    ("signature_status", "ALTER TABLE visits ADD COLUMN signature_status VARCHAR(16) NULL"),
+    ("method", "ALTER TABLE visits ADD COLUMN method VARCHAR(8) NULL"),
+)
+
+
+async def _ensure_added_columns(cur):
+    for column, ddl in ADDED_COLUMNS:
+        await cur.execute(
+            """
+            SELECT COUNT(*) FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = 'visits'
+              AND COLUMN_NAME = %s
+            """,
+            (column,),
+        )
+        if (await cur.fetchone())[0] == 0:
+            await cur.execute(ddl)
 
 
 def identify_bot(user_agent: str) -> tuple[str | None, str | None, str | None]:
@@ -267,9 +276,11 @@ async def log_visit(
     ip: str,
     is_honeypot: bool,
     signature_status: str | None = None,
+    method: str | None = None,
 ):
     path = (path or "")[:MAX_PATH_LEN]
     user_agent = (user_agent or "")[:MAX_UA_LEN]
+    method = (method or "")[:8].upper() or None
     bot_key, bot_name, operator = identify_bot(user_agent)
     ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
     ts = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -277,27 +288,35 @@ async def log_visit(
         async with conn.cursor() as cur:
             await cur.execute(
                 """INSERT INTO visits
-                   (ts, path, user_agent, bot_key, bot_name, operator, ip_hash, is_honeypot, signature_status)
-                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                (ts, path, user_agent, bot_key, bot_name, operator, ip_hash, int(is_honeypot), signature_status),
+                   (ts, path, user_agent, bot_key, bot_name, operator, ip_hash, is_honeypot,
+                    signature_status, method)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                (ts, path, user_agent, bot_key, bot_name, operator, ip_hash, int(is_honeypot),
+                 signature_status, method),
             )
 
 
-# Dedup meta-visits (robots.txt, sitemap.xml) per (path, bot-identity) within
-# a TTL window so an HN-hug doesn't fill the table with identical rows. Honey-
-# pot hits stay untouched — every violation is independent signal.
-_visit_dedup: dict[tuple[str, str], float] = {}
+# Dedup meta-visits (robots.txt, sitemap.xml) per (path, method, bot-identity)
+# within a TTL window so an HN-hug doesn't fill the table with identical rows.
+# Honeypot hits stay untouched — every violation is independent signal.
+#
+# Method is part of the key on purpose. A crawler that HEAD-probes a file and
+# then GETs it is doing two distinguishable things, and the whole point of the
+# method column is to tell them apart; keying on path alone would let whichever
+# arrived first silently swallow the other.
+_visit_dedup: dict[tuple[str, str, str], float] = {}
 META_DEDUP_TTL_S = 600
 
 
-def _should_log_meta_visit(path: str, user_agent: str) -> bool:
+def _should_log_meta_visit(path: str, user_agent: str, method: str = "GET") -> bool:
     bot_key, _, _ = identify_bot(user_agent)
     identity = bot_key or hashlib.sha256((user_agent or "").encode()).hexdigest()[:16]
+    key = (path, (method or "GET").upper(), identity)
     now = time.monotonic()
-    last = _visit_dedup.get((path, identity))
+    last = _visit_dedup.get(key)
     if last is not None and (now - last) < META_DEDUP_TTL_S:
         return False
-    _visit_dedup[(path, identity)] = now
+    _visit_dedup[key] = now
     return True
 
 
@@ -307,7 +326,7 @@ async def lifespan(app: FastAPI):
     async with pool.acquire() as conn:
         async with conn.cursor() as cur:
             await cur.execute(SCHEMA)
-            await _ensure_signature_status_column(cur)
+            await _ensure_added_columns(cur)
     app.state.db_pool = pool
     yield
     pool.close()
@@ -548,10 +567,11 @@ Sitemap: {SITE_BASE_URL}/sitemap.xml
 async def robots_txt(request: Request):
     ip = request.client.host
     ua = request.headers.get("user-agent", "")
-    if _should_log_meta_visit("/robots.txt", ua):
+    if _should_log_meta_visit("/robots.txt", ua, request.method):
         await log_visit(
             app.state.db_pool, "/robots.txt", ua, ip, is_honeypot=False,
             signature_status=request.state.signature_status,
+            method=request.method,
         )
     return ROBOTS_TXT
 
@@ -593,10 +613,11 @@ def _build_sitemap() -> str:
 async def sitemap_xml(request: Request):
     ip = request.client.host
     ua = request.headers.get("user-agent", "")
-    if _should_log_meta_visit("/sitemap.xml", ua):
+    if _should_log_meta_visit("/sitemap.xml", ua, request.method):
         await log_visit(
             app.state.db_pool, "/sitemap.xml", ua, ip, is_honeypot=False,
             signature_status=request.state.signature_status,
+            method=request.method,
         )
     return Response(content=_build_sitemap(), media_type="application/xml")
 
@@ -668,10 +689,11 @@ def build_api_catalog(base_url: str) -> dict:
 async def api_catalog(request: Request):
     ip = request.client.host
     ua = request.headers.get("user-agent", "")
-    if _should_log_meta_visit("/.well-known/api-catalog", ua):
+    if _should_log_meta_visit("/.well-known/api-catalog", ua, request.method):
         await log_visit(
             app.state.db_pool, "/.well-known/api-catalog", ua, ip, is_honeypot=False,
             signature_status=request.state.signature_status,
+            method=request.method,
         )
     return JSONResponse(
         content=build_api_catalog(SITE_BASE_URL),
@@ -684,10 +706,11 @@ async def api_catalog(request: Request):
 async def openapi_json(request: Request):
     ip = request.client.host
     ua = request.headers.get("user-agent", "")
-    if _should_log_meta_visit("/openapi.json", ua):
+    if _should_log_meta_visit("/openapi.json", ua, request.method):
         await log_visit(
             app.state.db_pool, "/openapi.json", ua, ip, is_honeypot=False,
             signature_status=request.state.signature_status,
+            method=request.method,
         )
     return JSONResponse(
         content=app.openapi(),
@@ -758,10 +781,11 @@ def build_ai_catalog(base_url: str) -> dict:
 async def ai_catalog(request: Request):
     ip = request.client.host
     ua = request.headers.get("user-agent", "")
-    if _should_log_meta_visit("/.well-known/ai-catalog.json", ua):
+    if _should_log_meta_visit("/.well-known/ai-catalog.json", ua, request.method):
         await log_visit(
             app.state.db_pool, "/.well-known/ai-catalog.json", ua, ip, is_honeypot=False,
             signature_status=request.state.signature_status,
+            method=request.method,
         )
     return JSONResponse(
         content=build_ai_catalog(SITE_BASE_URL),
@@ -803,10 +827,11 @@ async def mcp_endpoint(request: Request):
     ua = request.headers.get("user-agent", "")
     # Logged before any validation: a malformed call still tells us an agent
     # found the endpoint, which is the signal we are here to measure.
-    if _should_log_meta_visit("/mcp", ua):
+    if _should_log_meta_visit("/mcp", ua, request.method):
         await log_visit(
             app.state.db_pool, "/mcp", ua, ip, is_honeypot=False,
             signature_status=request.state.signature_status,
+            method=request.method,
         )
 
     origin = request.headers.get("origin")
@@ -858,10 +883,11 @@ async def mcp_endpoint(request: Request):
 async def mcp_endpoint_rejected(request: Request):
     ip = request.client.host
     ua = request.headers.get("user-agent", "")
-    if _should_log_meta_visit("/mcp", ua):
+    if _should_log_meta_visit("/mcp", ua, request.method):
         await log_visit(
             app.state.db_pool, "/mcp", ua, ip, is_honeypot=False,
             signature_status=request.state.signature_status,
+            method=request.method,
         )
     return JSONResponse(
         content={
@@ -940,10 +966,11 @@ The raw IP is never written to disk.
 async def llms_txt(request: Request):
     ip = request.client.host
     ua = request.headers.get("user-agent", "")
-    if _should_log_meta_visit("/llms.txt", ua):
+    if _should_log_meta_visit("/llms.txt", ua, request.method):
         await log_visit(
             app.state.db_pool, "/llms.txt", ua, ip, is_honeypot=False,
             signature_status=request.state.signature_status,
+            method=request.method,
         )
     return Response(content=LLMS_TXT, media_type="text/markdown; charset=utf-8")
 
@@ -1010,10 +1037,11 @@ async def agents_md(request: Request):
     # Log under the exact path requested so the three probe locations are
     # distinguishable in the data — which one an agent reaches for is signal.
     path = request.url.path
-    if _should_log_meta_visit(path, ua):
+    if _should_log_meta_visit(path, ua, request.method):
         await log_visit(
             app.state.db_pool, path, ua, ip, is_honeypot=False,
             signature_status=request.state.signature_status,
+            method=request.method,
         )
     return Response(content=AGENTS_MD, media_type="text/markdown; charset=utf-8")
 
@@ -1052,10 +1080,11 @@ async def blog_post(request: Request, slug: str):
 async def facts_index(request: Request):
     ip = request.client.host
     ua = request.headers.get("user-agent", "")
-    if _should_log_meta_visit("/facts", ua):
+    if _should_log_meta_visit("/facts", ua, request.method):
         await log_visit(
             app.state.db_pool, "/facts", ua, ip, is_honeypot=False,
             signature_status=request.state.signature_status,
+            method=request.method,
         )
     if _wants_markdown(request.headers.get("accept", "")):
         return Response(
@@ -1073,10 +1102,11 @@ async def facts_page(request: Request, slug: str):
     path = request.url.path
     ip = request.client.host
     ua = request.headers.get("user-agent", "")
-    if _should_log_meta_visit(path, ua):
+    if _should_log_meta_visit(path, ua, request.method):
         await log_visit(
             app.state.db_pool, path, ua, ip, is_honeypot=False,
             signature_status=request.state.signature_status,
+            method=request.method,
         )
     if _wants_markdown(request.headers.get("accept", "")):
         return Response(content=fact.md, media_type="text/markdown; charset=utf-8")
@@ -1097,6 +1127,7 @@ async def honeypot(request: Request, rest: str = ""):
     await log_visit(
         app.state.db_pool, str(request.url.path), ua, ip, is_honeypot=True,
         signature_status=request.state.signature_status,
+        method=request.method,
     )
     return PlainTextResponse("", status_code=200)
 
@@ -1131,7 +1162,7 @@ async def _compute_stats() -> dict:
             summary = await cur.fetchall()
 
             await cur.execute("""
-                SELECT ts, path, bot_name, operator, user_agent, signature_status
+                SELECT ts, path, bot_name, operator, user_agent, signature_status, method
                 FROM visits
                 WHERE is_honeypot = 1
                 ORDER BY ts DESC
@@ -1152,28 +1183,38 @@ async def _compute_stats() -> dict:
             # LLM/agent discovery files. llms.txt and the three agents.md probe
             # locations are reported as two columns. Placeholders are built from
             # the path tuples so the value list stays parameterised.
+            #
+            # A HEAD request is a *probe*, not a read: the crawler asked whether
+            # the file exists and never took the bytes. Every per-surface column
+            # therefore counts non-HEAD only, and HEAD is totalled separately in
+            # head_probes so the two are never conflated. Rows written before
+            # the method column existed are NULL and count as reads, which is
+            # correct by construction: HEAD returned 405 site-wide until the
+            # fix in 990c502, so nothing before it could have been a probe.
             agents_ph = ",".join(["%s"] * len(AGENTS_MD_PATHS))
             discovery_ph = ",".join(["%s"] * len(DISCOVERY_PATHS))
             catalog_ph = ",".join(["%s"] * len(API_CATALOG_PATHS))
             ard_ph = ",".join(["%s"] * len(ARD_CATALOG_PATHS))
             mcp_ph = ",".join(["%s"] * len(MCP_PATHS))
+            is_read = "(method IS NULL OR method <> 'HEAD')"
             await cur.execute(
                 f"""
                 SELECT COALESCE(bot_name, 'Unidentified') AS bot_name,
                        COALESCE(operator, '—') AS operator,
-                       CAST(SUM(path = '/llms.txt') AS UNSIGNED) AS llms_reads,
-                       CAST(SUM(path IN ({agents_ph})) AS UNSIGNED) AS agents_reads,
-                       CAST(SUM(path = '/facts' OR path LIKE '/facts/%%') AS UNSIGNED) AS facts_reads,
-                       CAST(SUM(path IN ({catalog_ph})) AS UNSIGNED) AS catalog_reads,
-                       CAST(SUM(path IN ({ard_ph})) AS UNSIGNED) AS ard_reads,
-                       CAST(SUM(path IN ({mcp_ph})) AS UNSIGNED) AS mcp_calls,
-                       COUNT(*) AS total_reads,
+                       CAST(SUM(path = '/llms.txt' AND {is_read}) AS UNSIGNED) AS llms_reads,
+                       CAST(SUM(path IN ({agents_ph}) AND {is_read}) AS UNSIGNED) AS agents_reads,
+                       CAST(SUM((path = '/facts' OR path LIKE '/facts/%%') AND {is_read}) AS UNSIGNED) AS facts_reads,
+                       CAST(SUM(path IN ({catalog_ph}) AND {is_read}) AS UNSIGNED) AS catalog_reads,
+                       CAST(SUM(path IN ({ard_ph}) AND {is_read}) AS UNSIGNED) AS ard_reads,
+                       CAST(SUM(path IN ({mcp_ph}) AND {is_read}) AS UNSIGNED) AS mcp_calls,
+                       CAST(SUM({is_read}) AS UNSIGNED) AS total_reads,
+                       CAST(SUM(method = 'HEAD') AS UNSIGNED) AS head_probes,
                        MAX(ts) AS last_seen
                 FROM visits
                 WHERE path IN ({discovery_ph}) OR path = '/facts' OR path LIKE '/facts/%%'
                    OR path IN ({catalog_ph}) OR path IN ({ard_ph}) OR path IN ({mcp_ph})
                 GROUP BY COALESCE(bot_name, 'Unidentified'), COALESCE(operator, '—')
-                ORDER BY total_reads DESC, last_seen DESC
+                ORDER BY COUNT(*) DESC, last_seen DESC
                 LIMIT 50
                 """,
                 (*AGENTS_MD_PATHS, *API_CATALOG_PATHS, *ARD_CATALOG_PATHS, *MCP_PATHS,
@@ -1181,13 +1222,23 @@ async def _compute_stats() -> dict:
             )
             discovery = await cur.fetchall()
 
+            # Ordering is by total events (reads + probes) so a bot that only
+            # ever HEAD-probes cannot be pushed off the LIMIT by having zero
+            # reads — it is exactly the case this column exists to surface.
+            # NB: `reads` is a reserved word in MySQL (READS SQL DATA), so the
+            # aliases here are read_count/probe_count rather than the obvious
+            # reads/probes.
             await cur.execute(
-                f"SELECT COUNT(*) AS c FROM visits "
+                f"SELECT CAST(SUM({is_read}) AS UNSIGNED) AS read_count, "
+                f"       CAST(SUM(method = 'HEAD') AS UNSIGNED) AS probe_count "
+                f"FROM visits "
                 f"WHERE path IN ({discovery_ph}) OR path = '/facts' OR path LIKE '/facts/%%' "
                 f"OR path IN ({catalog_ph}) OR path IN ({ard_ph}) OR path IN ({mcp_ph})",
                 (*DISCOVERY_PATHS, *API_CATALOG_PATHS, *ARD_CATALOG_PATHS, *MCP_PATHS),
             )
-            total_discovery = (await cur.fetchone())["c"]
+            totals = await cur.fetchone()
+            total_discovery = int(totals["read_count"] or 0)
+            total_head_probes = int(totals["probe_count"] or 0)
 
     return {
         "summary": summary,
@@ -1197,6 +1248,7 @@ async def _compute_stats() -> dict:
         "total_verified": total_verified,
         "discovery_reads": discovery,
         "total_discovery_reads": total_discovery,
+        "total_head_probes": total_head_probes,
     }
 
 

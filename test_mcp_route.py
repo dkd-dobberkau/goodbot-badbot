@@ -20,7 +20,8 @@ from app.mcp import PROTOCOL_VERSION
 logged: list[str] = []
 
 
-async def fake_log_visit(pool, path, ua, ip, *, is_honeypot=False, signature_status=None):
+async def fake_log_visit(pool, path, ua, ip, *, is_honeypot=False, signature_status=None,
+                         method=None):
     logged.append(path)
 
 
@@ -29,7 +30,7 @@ async def fake_stats():
         "summary": [{"bot_name": "GPTBot", "operator": "OpenAI", "total_visits": 3,
                      "violations": 2, "verified_visits": 0, "last_seen": None}],
         "total_violations": 2, "total_bots_seen": 1, "total_verified": 0,
-        "total_discovery_reads": 4,
+        "total_discovery_reads": 4, "total_head_probes": 0,
     }
 
 
