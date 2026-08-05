@@ -27,11 +27,12 @@ What changed on the other side is that the cost collapsed. Protocol revision
 Streamable HTTP. Every request is now self-contained — it carries its own
 protocol version and client identity — so a read-only server is a pure function
 over data you already have. No session store, no background stream, no state
-machine. [Dries Buytaert](https://dri.es/), whose lead this site has now
-followed four times, shipped his site-search server in under 150 lines and said
-the revision was what made it feasible. Ours is about the same size, and it
-issues **zero new database queries**: both tools read the same five-second stats
-cache the dashboard already polls.
+machine. Ours came in at about 150 lines and issues **zero new database
+queries**: both tools read the same five-second stats cache the dashboard
+already polls. [Dries Buytaert](https://dri.es/) landed at roughly the same
+size building something quite different — search over a personal site — which
+is a useful independent check that the number reflects the protocol revision
+rather than how little our particular API does.
 
 ## What it does
 
@@ -79,10 +80,12 @@ than just useful.
 
 **MCP has no discovery specification.** There is no `.well-known` path for it,
 no `Link` relation, nothing in any published standard that tells an agent that
-`/mcp` exists. Dries hit exactly this wall: he built the server, then found the
-three candidate discovery routes were an IETF standard nobody reads, a draft
-nobody has implemented, and — for the endpoint itself — nothing at all. His
-fallback was a hand-written Agent Skill pointing at his API catalog.
+`/mcp` exists. This is not an idiosyncrasy of our setup: anyone who publishes an
+MCP endpoint arrives at the same three dead ends — an IETF standard nobody
+reads, a draft nobody has implemented, and, for the endpoint itself, nothing at
+all. Dries Buytaert documented that inventory from the search side and fell back
+to a hand-written Agent Skill; we reached it from the measurement side and drew
+a different conclusion about what to do next.
 
 So `/mcp` is announced in exactly three places — the ARD manifest, `llms.txt`,
 and `agents.md` — and **deliberately kept out of the homepage `Link` header**,
@@ -186,8 +189,8 @@ an admission about the limits of this instrument.
 
 ## Sources and further reading
 
-- [Dries Buytaert — Helping agents discover my site search with MCP](https://dri.es/helping-agents-discover-my-site-search-with-mcp) — the post this one follows, and the source of the "discovery and invocation are separate layers" framing.
 - [MCP specification, revision 2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http) — the Streamable HTTP binding, including the header-mirroring rules and why `GET` is now a `405`.
 - [MCP versioning](https://modelcontextprotocol.io/specification/2026-07-28/basic/versioning) — how a handshake-free protocol negotiates versions, and why `server/discover` is mandatory.
 - [Agentic Resource Discovery](https://agenticresourcediscovery.org/spec/) — where the MCP server card is advertised, from our [previous post](/blog/ai-catalog).
 - [WebMCP updates and next steps](https://patrickbrosset.com/articles/2026-02-23-webmcp-updates-clarifications-and-next-steps/) — the browser-side API this is not.
+- [Dries Buytaert — Helping agents discover my site search with MCP](https://dri.es/helping-agents-discover-my-site-search-with-mcp) — a parallel implementation over site search, and the origin of the "discovery and invocation are separate layers" distinction used above.
