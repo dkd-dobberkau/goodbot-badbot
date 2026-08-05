@@ -1,7 +1,7 @@
 ---
 title: An MCP endpoint nobody can find
 date: 2026-08-05
-summary: The site now answers POST /mcp — a stateless Model Context Protocol server exposing the compliance data as two callable tools. It is the fifth discovery signal and the first that is an interface rather than a document. It is also the only one with no discovery standard behind it: nothing in any spec tells an agent that /mcp exists. So we announced it in three places, deliberately left it out of a fourth, and can now tell the agents that guessed the path from the ones that followed a pointer.
+summary: The site now answers POST /mcp — a stateless Model Context Protocol server exposing the compliance data as two callable tools. It is the fifth discovery signal and the first that is an interface rather than a document, and the only one with no discovery standard behind it: nothing in any spec tells an agent that /mcp exists. So we announced it in three places, deliberately left it out of a fourth, and can now tell the agents that guessed the path from the ones that followed a pointer. Building it also exposed that the site had been answering every HEAD request with 405 — meaning a crawler could have probed a honeypot unrecorded — so reads and probes are now counted separately.
 ---
 
 For two months this site's `agents.md` said, in as many words:
@@ -96,6 +96,52 @@ the question stays answerable later even if we think of a better way to ask it.
 Nobody has published numbers on this, because until the handshake came out of
 the protocol almost nobody had a public MCP endpoint sitting on a domain with
 honest request logs. We do now.
+
+## Reads and probes are not the same thing
+
+Shipping the endpoint turned up something embarrassing about the rest of the
+site. While checking that `GET /mcp` returned a clean `405`, a `HEAD` against
+the homepage came back `405` too. So did `HEAD /robots.txt`. So did every
+route on the site.
+
+The cause was mundane: Starlette 1.x stopped adding `HEAD` implicitly to
+routes that declare `GET`, which older versions did automatically. Every
+handler here inherited the old assumption and nobody noticed, because browsers
+and `curl` default to `GET` and the dashboard looked fine.
+
+The consequence was not mundane. Crawlers routinely send `HEAD` before
+fetching — to check freshness, size, or whether a URL exists at all. This site
+was answering all of them with "method not allowed", which means **a crawler
+could have `HEAD`-probed a `Disallow`'d honeypot and never been recorded as a
+violation**. A site whose entire purpose is measuring whether crawlers respect
+`robots.txt` was refusing a standard HTTP method and quietly dropping the
+evidence. `robots.txt` rules are method-independent; our enforcement was not.
+
+That is fixed, and it forced a distinction worth making explicit. A `HEAD`
+request asks whether something exists without taking the bytes. That is a
+*probe*, not a *read*, and folding the two together would have inflated every
+"discovery read" number on the dashboard with crawlers that never actually
+consumed anything. So the `visits` table now records the HTTP method, every
+per-surface column counts non-`HEAD` only, and probes get their own **head
+probes** column beside them.
+
+Two footnotes on the data, both in the spirit of saying what the numbers
+actually mean:
+
+- Every read logged **before** August 2026 is a `GET` by construction, not by
+  assumption. `HEAD` returned `405` site-wide until the fix, so no historical
+  row could have been a probe. The back-catalogue is clean.
+- The probe column therefore necessarily starts at zero. A quiet column here
+  means something different from a quiet `ai catalog` column: not "nobody is
+  looking", but "we have only just started listening".
+
+There is a general lesson in this that applies well beyond one site. An
+instrument that silently rejects a class of input does not report a smaller
+number — it reports a *wrong* number, confidently, with no indication anything
+is missing. We were publishing compliance statistics with a hole in the
+collection layer and no way to see it from the output. The only reason it
+surfaced is that building something unrelated made us look at raw status codes
+again.
 
 ## The honest part
 
