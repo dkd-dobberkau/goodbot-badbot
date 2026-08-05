@@ -691,7 +691,7 @@
 </div>
 
 <section class="discovery-section">
-  <h2 class="panel-title" id="discovery-title">Discovery Reads — who fetches llms.txt, agents.md, grounding pages &amp; the API/AI catalogs</h2>
+  <h2 class="panel-title" id="discovery-title">Discovery Reads — who fetches llms.txt, agents.md, grounding pages, the API/AI catalogs &amp; the MCP endpoint</h2>
   <p class="discovery-intro">
     These files are <strong>invitations</strong>, not traps:
     <code>/llms.txt</code> is the LLM-oriented site summary, and
@@ -703,7 +703,12 @@
     interface instead of scraping this page. The
     <code>/.well-known/ai-catalog.json</code> Agentic Resource Discovery
     manifest goes further still — it lets agent-facing registries index this
-    site so agents can find it in the first place. Reading any of them is
+    site so agents can find it in the first place. Finally
+    <code>/mcp</code> is a stateless Model Context Protocol server: not a
+    document to read but an interface to <em>call</em>, offering the same
+    compliance data as two read-only tools. MCP has no discovery standard, so
+    nothing tells an agent that path exists — how one finds it is itself the
+    measurement. Reading or calling any of them is
     <strong>not a violation</strong> — it is the opposite signal: an agent
     deliberately doing discovery. So far <strong id="discoveryTotal">—</strong>
     discovery reads have been logged.
@@ -718,12 +723,13 @@
         <th scope="col" style="text-align:right">grounding</th>
         <th scope="col" style="text-align:right">api catalog</th>
         <th scope="col" style="text-align:right">ai catalog</th>
+        <th scope="col" style="text-align:right">mcp calls</th>
         <th scope="col" style="text-align:right">Total</th>
         <th scope="col" style="text-align:right">Last read</th>
       </tr>
     </thead>
     <tbody id="discoveryTable">
-      <tr><td colspan="9" class="empty-state">Loading…</td></tr>
+      <tr><td colspan="10" class="empty-state">Loading…</td></tr>
     </tbody>
   </table>
 </section>
@@ -835,7 +841,7 @@ function renderStats(data) {
   const discTable = document.getElementById('discoveryTable');
   const discovery = data.discovery_reads || [];
   if (discovery.length === 0) {
-    discTable.innerHTML = `<tr><td colspan="9" class="empty-state">No discovery reads logged yet.</td></tr>`;
+    discTable.innerHTML = `<tr><td colspan="10" class="empty-state">No discovery reads logged yet.</td></tr>`;
   } else {
     discTable.innerHTML = discovery.map(row => {
       const llms = Number(row.llms_reads) || 0;
@@ -843,6 +849,7 @@ function renderStats(data) {
       const facts = Number(row.facts_reads) || 0;
       const catalog = Number(row.catalog_reads) || 0;
       const ard = Number(row.ard_reads) || 0;
+      const mcpCalls = Number(row.mcp_calls) || 0;
       const total = Number(row.total_reads) || 0;
       const cell = (n) => `<td class="read-count ${n > 0 ? 'nonzero' : 'zero'}">${n > 0 ? n : '—'}</td>`;
       const lastRead = row.last_seen
@@ -856,6 +863,7 @@ function renderStats(data) {
         ${cell(facts)}
         ${cell(catalog)}
         ${cell(ard)}
+        ${cell(mcpCalls)}
         <td class="read-count nonzero">${total}</td>
         <td class="last-seen">${esc(lastRead)}</td>
       </tr>`;

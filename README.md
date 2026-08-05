@@ -70,11 +70,36 @@ settings come from the `MYSQL_*` env vars in `docker-compose.yml`.
 ## API
 
 ```
-GET /              # dashboard
-GET /robots.txt    # the honeypot rules
-GET /api/stats     # JSON: per-bot summary + recent violations
-GET /favicon.ico   # 🤖
+GET  /              # dashboard
+GET  /robots.txt    # the honeypot rules
+GET  /api/stats     # JSON: per-bot summary + recent violations
+GET  /favicon.ico   # 🤖
+POST /mcp           # MCP server (revision 2026-07-28), see below
 ```
+
+### MCP endpoint
+
+`POST /mcp` is a stateless Model Context Protocol server. Revision
+`2026-07-28` removed the `initialize` handshake and protocol-level
+sessions, so every request is self-contained and the whole server is a
+pure function over the already-cached `/api/stats` snapshot
+([`app/mcp.py`](app/mcp.py)). It answers the three methods the spec
+requires — `server/discover`, `tools/list`, `tools/call` — and exposes
+two read-only tools: `get_compliance_stats` (the full scoreboard) and
+`check_bot` (one crawler, by display name or User-Agent string). There
+are no write operations.
+
+```bash
+curl -sX POST https://goodbot-badbot.com/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -H 'MCP-Protocol-Version: 2026-07-28' \
+  -H 'Mcp-Method: tools/list' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+`GET` and `DELETE` return `405` — this revision has no GET stream and no
+session teardown.
 
 ## Agent discoverability
 
@@ -85,19 +110,34 @@ ai-train=no`), content negotiation for `Accept: text/markdown`, and a
 JWKS at `/.well-known/http-message-signatures-directory` for Web Bot
 Auth identity.
 
-DNS for AI Discovery (DNS-AID) is intentionally **not** implemented.
-DNS-AID exists to point agents at A2A / MCP / JSON-RPC endpoints;
-goodbot-badbot has no such endpoint to advertise. Publishing a SVCB
-record pointing at the HTML dashboard or the stats JSON would be
-compliance theatre. The site is an observer of agents, not an agent.
+Beyond those, five surfaces are logged as **Discovery Reads** — the
+inverse of a honeypot hit, an agent deliberately doing discovery rather
+than ignoring a rule: `/llms.txt`, `agents.md` (served at `/AGENTS.md`,
+`/agents.md` and `/.well-known/agents.md`, logged per probe location so
+the three are distinguishable), the grounding pages under `/facts`, the
+RFC 9264 catalog at `/.well-known/api-catalog`, the ARD manifest at
+`/.well-known/ai-catalog.json`, and calls to `/mcp`. Reading or calling
+any of them is never a violation.
 
-For the same reason there is no `ai-catalog.json` (ARD) manifest: it
-advertises agent/tool endpoints the site does not have. There **is** a
-short `agents.md`, served at `/AGENTS.md`, `/agents.md`, and
-`/.well-known/agents.md`, but only as a *measurement surface* — it
-states plainly that the site has no callable endpoint, and every read is
-logged (per probe location, so the three are distinguishable) to observe
-which agents reach for it. This is not the repository
+`/mcp` is the only one that is an *invocation* surface rather than a
+document, and the only one with no discovery standard behind it: nothing
+in any spec tells an agent that path exists. So it is announced in the
+ARD manifest, `llms.txt` and `agents.md`, and deliberately left **out**
+of the homepage `Link` header. A bot that calls `/mcp` having never read
+a discovery file guessed the path; one that reads `ai-catalog.json`
+first followed an advertisement. Both land in the same log, so the two
+cases separate by query rather than by schema — which is the open
+question [Dries Buytaert flagged][dries] when he shipped an MCP endpoint
+with nowhere to advertise it.
+
+[dries]: https://dri.es/helping-agents-discover-my-site-search-with-mcp
+
+DNS for AI Discovery (DNS-AID) is still intentionally **not**
+implemented. A SVCB record would have to be maintained in DNS by hand
+and cannot be observed the way an HTTP fetch can, so it adds a
+maintenance surface without adding a measurement.
+
+Note that the site's `agents.md` is not the repository
 [`AGENTS.md`](AGENTS.md) coding-agent standard, which lives in the repo
 root for tools working on this codebase.
 

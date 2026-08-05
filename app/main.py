@@ -26,7 +26,7 @@ from http_message_signatures import (
     algorithms,
 )
 
-from app import blog, facts
+from app import blog, facts, mcp
 
 # Hard caps to keep oversized inputs from blowing past column limits or
 # bloating the DB. VARCHAR(512) is the path column; UA TEXT is generous.
@@ -49,6 +49,7 @@ RATE_LIMIT_RULES = (
     ("/.well-known/agents.md",  60),
     ("/.well-known/api-catalog", 60),
     ("/.well-known/ai-catalog.json", 60),
+    ("/mcp",                    60),
     ("/openapi.json",           60),
     ("/.well-known/http-message-signatures-directory", 60),
     ("/do-not-crawl",           30),
@@ -192,6 +193,17 @@ API_CATALOG_PATHS = ("/.well-known/api-catalog", "/openapi.json")
 # registry crawlers are visible on this measurement site, rather than being
 # folded into catalog_reads. See dri.es "Agentic Resource Discovery".
 ARD_CATALOG_PATHS = ("/.well-known/ai-catalog.json",)
+
+# MCP endpoint. A fifth Discovery signal, and the only one that is an
+# *invocation* surface rather than a document: everything above is something an
+# agent reads, this is something an agent calls. MCP has no discovery
+# specification — nothing tells an agent that /mcp exists — so it is announced
+# only in the ARD manifest, llms.txt and agents.md, and deliberately left out of
+# the homepage Link header. That asymmetry is the experiment: a bot that hits
+# /mcp having never read a discovery file guessed the path; one that reads
+# ai-catalog.json first followed an advertisement. Both are logged under the
+# same path, so the two cases are separated by query, not by schema.
+MCP_PATHS = ("/mcp",)
 
 
 DB_CONFIG = {
@@ -715,7 +727,29 @@ def build_ai_catalog(base_url: str) -> dict:
                     "How many bots tripped the honeypot?",
                     "Is a given AI crawler a good bot or a bad bot?",
                 ],
-            }
+            },
+            {
+                # The MCP endpoint is POST-only and serves no artifact
+                # document, so the server card is inlined via `data` rather
+                # than referenced by `url` — the shape the ARD spec's own MCP
+                # example uses. The card is generated from the same tool
+                # definitions the endpoint serves, so the two cannot drift.
+                "identifier": f"urn:air:{host}:mcp",
+                "displayName": "goodbot-badbot MCP server",
+                "type": "application/mcp-server-card+json",
+                "data": mcp.build_server_card(f"{base_url}/mcp"),
+                "description": (
+                    "Stateless MCP server exposing the same compliance data as "
+                    "callable tools: a scoreboard of all observed AI crawlers, "
+                    "and a per-crawler lookup by name or user-agent."
+                ),
+                "capabilities": [tool["name"] for tool in mcp.TOOLS],
+                "representativeQueries": [
+                    "Look up whether a specific crawler obeys robots.txt",
+                    "Get the current AI-crawler compliance scoreboard",
+                    "Check if this user-agent is a known AI crawler",
+                ],
+            },
         ],
     }
 
@@ -733,6 +767,116 @@ async def ai_catalog(request: Request):
         content=build_ai_catalog(SITE_BASE_URL),
         media_type="application/json",
         headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+# ── /mcp (Model Context Protocol, revision 2026-07-28) ───────────────────────
+
+# The protocol logic lives in app/mcp.py as a pure function; this route is only
+# I/O: Origin check, body cap, visit logging, and handing the already-cached
+# stats payload to the dispatcher. No new DB queries — tools read the same
+# 5-second-TTL snapshot the dashboard polls.
+
+# DNS-rebinding guard required by the transport spec. Non-browser MCP clients
+# send no Origin at all, so absence is allowed; a present-but-foreign Origin is
+# refused. Localhost entries are for `mcp-explorer` and local dev only.
+ALLOWED_MCP_ORIGINS = frozenset({
+    SITE_BASE_URL,
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+})
+
+# Any legitimate JSON-RPC call here is a few hundred bytes; the cap exists so a
+# hostile POST cannot make us buffer megabytes before parsing.
+MAX_MCP_BODY_BYTES = 64 * 1024
+
+
+def _mcp_json(status: int, payload: dict | None) -> Response:
+    if payload is None:
+        return Response(status_code=status)
+    return JSONResponse(content=payload, status_code=status, headers={"Cache-Control": "no-store"})
+
+
+@app.post("/mcp", include_in_schema=False)
+async def mcp_endpoint(request: Request):
+    ip = request.client.host
+    ua = request.headers.get("user-agent", "")
+    # Logged before any validation: a malformed call still tells us an agent
+    # found the endpoint, which is the signal we are here to measure.
+    if _should_log_meta_visit("/mcp", ua):
+        await log_visit(
+            app.state.db_pool, "/mcp", ua, ip, is_honeypot=False,
+            signature_status=request.state.signature_status,
+        )
+
+    origin = request.headers.get("origin")
+    if origin is not None and origin not in ALLOWED_MCP_ORIGINS:
+        return _mcp_json(403, {
+            "jsonrpc": "2.0",
+            "error": {"code": mcp.INVALID_REQUEST, "message": "Origin not allowed"},
+        })
+
+    declared_length = request.headers.get("content-length")
+    if declared_length is not None and declared_length.isdigit() and int(declared_length) > MAX_MCP_BODY_BYTES:
+        return _mcp_json(413, {
+            "jsonrpc": "2.0",
+            "id": None,
+            "error": {"code": mcp.INVALID_REQUEST, "message": "Request body too large"},
+        })
+
+    raw = await request.body()
+    if len(raw) > MAX_MCP_BODY_BYTES:
+        return _mcp_json(413, {
+            "jsonrpc": "2.0",
+            "id": None,
+            "error": {"code": mcp.INVALID_REQUEST, "message": "Request body too large"},
+        })
+
+    try:
+        body = json.loads(raw)
+    except ValueError:
+        return _mcp_json(400, {
+            "jsonrpc": "2.0",
+            "id": None,
+            "error": {"code": mcp.PARSE_ERROR, "message": "Parse error"},
+        })
+
+    headers = {k.lower(): v for k, v in request.headers.items()}
+    status, payload = mcp.handle_rpc(
+        body, headers,
+        stats=await _get_stats_cached(),
+        identify_bot=identify_bot,
+    )
+    return _mcp_json(status, payload)
+
+
+# Revision 2026-07-28 removed the GET stream and the DELETE session teardown;
+# a server that speaks only this revision answers both with 405. We still log
+# them — a GET probe is the clearest possible evidence that an agent guessed
+# this path exists.
+@app.api_route("/mcp", methods=["GET", "DELETE"], include_in_schema=False)
+async def mcp_endpoint_rejected(request: Request):
+    ip = request.client.host
+    ua = request.headers.get("user-agent", "")
+    if _should_log_meta_visit("/mcp", ua):
+        await log_visit(
+            app.state.db_pool, "/mcp", ua, ip, is_honeypot=False,
+            signature_status=request.state.signature_status,
+        )
+    return JSONResponse(
+        content={
+            "jsonrpc": "2.0",
+            "error": {
+                "code": mcp.METHOD_NOT_FOUND,
+                "message": (
+                    "This MCP endpoint accepts POST only. Protocol revision "
+                    f"{mcp.PROTOCOL_VERSION} removed the GET stream and "
+                    "protocol-level sessions."
+                ),
+            },
+        },
+        status_code=405,
+        headers={"Allow": "POST", "Cache-Control": "no-store"},
     )
 
 
@@ -758,6 +902,7 @@ trips a honeypot, where its visit is recorded.
 - [JSON stats](https://goodbot-badbot.com/api/stats): machine-readable summary
 - [API catalog](https://goodbot-badbot.com/.well-known/api-catalog): RFC 9264 linkset pointing to the JSON stats API and its OpenAPI description
 - [AI catalog](https://goodbot-badbot.com/.well-known/ai-catalog.json): Agentic Resource Discovery manifest so registries can index the stats API
+- [MCP endpoint](https://goodbot-badbot.com/mcp): stateless Model Context Protocol server (revision 2026-07-28, POST only) exposing two read-only tools — `get_compliance_stats` and `check_bot`
 - [robots.txt](https://goodbot-badbot.com/robots.txt): the honeypot rules
 
 ## Grounding pages
@@ -816,8 +961,8 @@ async def llms_txt(request: Request):
 AGENTS_MD = """# goodbot-badbot — agents.md
 
 > This site is an *observer* of AI agents and crawlers, not an agent itself.
-> It exposes no callable agent, tool, or API endpoint to act on. There is
-> nothing here to invoke — only something to read.
+> It exposes exactly one callable surface — a read-only MCP server over its own
+> measurements. Nothing here can be changed by a caller.
 
 ## What this is
 
@@ -834,16 +979,25 @@ logged as a violation, regardless of user-agent, and published live.
 
 Please honour /robots.txt. The `Disallow` list is the entire experiment.
 
-## No agent endpoints
+## What an agent can call here
 
-There is no MCP server, A2A endpoint, or JSON-RPC tool to discover here. This
-file exists so that agent *discovery behaviour* can itself be observed.
+`POST https://goodbot-badbot.com/mcp` — a stateless MCP server speaking
+protocol revision `2026-07-28`. No `initialize` handshake, no sessions: send
+`server/discover`, `tools/list` or `tools/call` as a single JSON-RPC POST with
+the `MCP-Protocol-Version` and `Mcp-Method` headers. Two read-only tools:
+
+- `get_compliance_stats` — the full crawler scoreboard
+- `check_bot` — one crawler, by display name or User-Agent string
+
+There is no A2A endpoint and no write operation of any kind.
 
 ## Transparency
 
-Requests to this file are logged (user-agent plus a SHA-256-truncated IP hash,
-the same privacy model as the rest of the site) so we can measure which agents
-probe for it.
+Requests to this file and to /mcp are logged (user-agent plus a
+SHA-256-truncated IP hash, the same privacy model as the rest of the site) so
+we can measure which agents probe for them. MCP has no discovery
+specification, so how an agent finds /mcp — by reading this file, by reading
+the ARD manifest, or by guessing the path outright — is itself the measurement.
 """
 
 
@@ -1002,6 +1156,7 @@ async def _compute_stats() -> dict:
             discovery_ph = ",".join(["%s"] * len(DISCOVERY_PATHS))
             catalog_ph = ",".join(["%s"] * len(API_CATALOG_PATHS))
             ard_ph = ",".join(["%s"] * len(ARD_CATALOG_PATHS))
+            mcp_ph = ",".join(["%s"] * len(MCP_PATHS))
             await cur.execute(
                 f"""
                 SELECT COALESCE(bot_name, 'Unidentified') AS bot_name,
@@ -1011,25 +1166,26 @@ async def _compute_stats() -> dict:
                        CAST(SUM(path = '/facts' OR path LIKE '/facts/%%') AS UNSIGNED) AS facts_reads,
                        CAST(SUM(path IN ({catalog_ph})) AS UNSIGNED) AS catalog_reads,
                        CAST(SUM(path IN ({ard_ph})) AS UNSIGNED) AS ard_reads,
+                       CAST(SUM(path IN ({mcp_ph})) AS UNSIGNED) AS mcp_calls,
                        COUNT(*) AS total_reads,
                        MAX(ts) AS last_seen
                 FROM visits
                 WHERE path IN ({discovery_ph}) OR path = '/facts' OR path LIKE '/facts/%%'
-                   OR path IN ({catalog_ph}) OR path IN ({ard_ph})
+                   OR path IN ({catalog_ph}) OR path IN ({ard_ph}) OR path IN ({mcp_ph})
                 GROUP BY COALESCE(bot_name, 'Unidentified'), COALESCE(operator, '—')
                 ORDER BY total_reads DESC, last_seen DESC
                 LIMIT 50
                 """,
-                (*AGENTS_MD_PATHS, *API_CATALOG_PATHS, *ARD_CATALOG_PATHS,
-                 *DISCOVERY_PATHS, *API_CATALOG_PATHS, *ARD_CATALOG_PATHS),
+                (*AGENTS_MD_PATHS, *API_CATALOG_PATHS, *ARD_CATALOG_PATHS, *MCP_PATHS,
+                 *DISCOVERY_PATHS, *API_CATALOG_PATHS, *ARD_CATALOG_PATHS, *MCP_PATHS),
             )
             discovery = await cur.fetchall()
 
             await cur.execute(
                 f"SELECT COUNT(*) AS c FROM visits "
                 f"WHERE path IN ({discovery_ph}) OR path = '/facts' OR path LIKE '/facts/%%' "
-                f"OR path IN ({catalog_ph}) OR path IN ({ard_ph})",
-                (*DISCOVERY_PATHS, *API_CATALOG_PATHS, *ARD_CATALOG_PATHS),
+                f"OR path IN ({catalog_ph}) OR path IN ({ard_ph}) OR path IN ({mcp_ph})",
+                (*DISCOVERY_PATHS, *API_CATALOG_PATHS, *ARD_CATALOG_PATHS, *MCP_PATHS),
             )
             total_discovery = (await cur.fetchone())["c"]
 

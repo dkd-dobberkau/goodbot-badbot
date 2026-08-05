@@ -31,8 +31,9 @@ def main() -> int:
     check("specVersion is 1.0", cat.get("specVersion") == "1.0")
     check("host has a displayName", bool(cat.get("host", {}).get("displayName")))
     check("has entries array", isinstance(cat.get("entries"), list))
-    check("exactly one entry", len(cat["entries"]) == 1)
-    entry = cat["entries"][0]
+    # Two entries: the OpenAPI-described stats API, and the MCP server.
+    check("two entries", len(cat["entries"]) == 2)
+    entry, mcp_entry = cat["entries"]
 
     # Identifier is a URN scoped to the host so registries can dedupe.
     check("identifier is a host-scoped URN",
@@ -50,6 +51,25 @@ def main() -> int:
     check("has representativeQueries", isinstance(queries, list) and len(queries) >= 3)
     check("queries are on-topic (robots.txt)",
           any("robots.txt" in q.lower() for q in queries))
+
+    # The MCP entry. /mcp is POST-only and serves no artifact document, so ARD
+    # requires the server card be inlined via `data` rather than linked by
+    # `url` — the two are mutually exclusive.
+    check("mcp identifier is a host-scoped URN",
+          mcp_entry["identifier"] == "urn:air:goodbot-badbot.com:mcp")
+    check("mcp entry uses the MCP server-card media type",
+          mcp_entry["type"] == "application/mcp-server-card+json")
+    check("mcp entry inlines the card via data", isinstance(mcp_entry.get("data"), dict))
+    check("mcp entry has no url alongside data", "url" not in mcp_entry)
+    check("mcp card points at the endpoint",
+          mcp_entry["data"]["url"] == base + "/mcp")
+    check("mcp card advertises tools",
+          [t["name"] for t in mcp_entry["data"]["tools"]]
+          == ["get_compliance_stats", "check_bot"])
+    check("mcp entry lists capabilities",
+          mcp_entry.get("capabilities") == ["get_compliance_stats", "check_bot"])
+    check("mcp entry has representativeQueries",
+          len(mcp_entry.get("representativeQueries") or []) >= 2)
 
     # No honeypot path may ever leak into the manifest — it is an offer, not a
     # trap. Scan for the leading-slash path forms, not bare words: a
