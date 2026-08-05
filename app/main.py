@@ -1288,3 +1288,66 @@ async def index(request: Request):
     with open("templates/index.html") as f:
         html = f.read()
     return HTMLResponse(content=html, headers=base_headers)
+
+
+# ── HEAD support ─────────────────────────────────────────────────────────────
+
+# Starlette 1.x stopped adding HEAD implicitly to routes that declare GET;
+# older versions did it inside Route.__init__. Every @app.get here inherited
+# that assumption, so the whole site answered HEAD with 405 — including
+# /robots.txt and the honeypots.
+#
+# On a measurement site that is not cosmetic. Crawlers routinely send HEAD
+# before fetching, so a 405 both discards that signal and lets a bot probe a
+# Disallow'd honeypot without being recorded as a violation. robots.txt rules
+# are method-independent; our enforcement should be too.
+#
+# Done centrally, after every route is registered, so a new @app.get cannot
+# forget it. HEAD then runs the same handler as GET — which means the visit is
+# logged identically — and the ASGI server drops the body while keeping the
+# Content-Length it would have had, which is what HTTP requires.
+def _allow_head_on_get_routes(application: FastAPI) -> list[str]:
+    """Add HEAD to every route that declares GET. Returns the paths patched."""
+    patched = []
+    for route in application.routes:
+        # Mounts (e.g. /vendor StaticFiles) expose no .methods and handle HEAD
+        # themselves; skip anything without an explicit method set.
+        methods = getattr(route, "methods", None)
+        if methods and "GET" in methods and "HEAD" not in methods:
+            methods.add("HEAD")
+            patched.append(getattr(route, "path", "?"))
+    return patched
+
+
+HEAD_ENABLED_PATHS = _allow_head_on_get_routes(app)
+
+
+# FastAPI computes one operationId per *route* (fixed at creation time from
+# whichever method the set happened to yield first) but emits one operation per
+# *method*. So a GET+HEAD route produces two operations sharing one id, which
+# is invalid OpenAPI — and this site advertises /openapi.json as its machine
+# interface from two catalogs, so serving an invalid document is not an option.
+#
+# HEAD is implied by GET in HTTP and is conventionally left undocumented, so
+# the generated document keeps GET only. The duplicate-id warning FastAPI logs
+# while generating is expected here and would otherwise fire 13 times on the
+# first request; it is filtered narrowly by message so a genuine duplicate
+# elsewhere still surfaces.
+_generate_openapi = app.openapi
+
+
+def _openapi_without_head() -> dict:
+    if app.openapi_schema is not None:
+        return app.openapi_schema
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="Duplicate Operation ID.*", category=UserWarning)
+        schema = _generate_openapi()
+    for path_item in schema.get("paths", {}).values():
+        path_item.pop("head", None)
+    app.openapi_schema = schema
+    return schema
+
+
+app.openapi = _openapi_without_head
