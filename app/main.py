@@ -1208,7 +1208,7 @@ async def _compute_stats() -> dict:
                        CAST(SUM(path IN ({ard_ph}) AND {is_read}) AS UNSIGNED) AS ard_reads,
                        CAST(SUM(path IN ({mcp_ph}) AND {is_read}) AS UNSIGNED) AS mcp_calls,
                        CAST(SUM({is_read}) AS UNSIGNED) AS total_reads,
-                       CAST(SUM(method = 'HEAD') AS UNSIGNED) AS head_probes,
+                       CAST(COALESCE(SUM(method = 'HEAD'), 0) AS UNSIGNED) AS head_probes,
                        MAX(ts) AS last_seen
                 FROM visits
                 WHERE path IN ({discovery_ph}) OR path = '/facts' OR path LIKE '/facts/%%'
@@ -1230,7 +1230,7 @@ async def _compute_stats() -> dict:
             # reads/probes.
             await cur.execute(
                 f"SELECT CAST(SUM({is_read}) AS UNSIGNED) AS read_count, "
-                f"       CAST(SUM(method = 'HEAD') AS UNSIGNED) AS probe_count "
+                f"       CAST(COALESCE(SUM(method = 'HEAD'), 0) AS UNSIGNED) AS probe_count "
                 f"FROM visits "
                 f"WHERE path IN ({discovery_ph}) OR path = '/facts' OR path LIKE '/facts/%%' "
                 f"OR path IN ({catalog_ph}) OR path IN ({ard_ph}) OR path IN ({mcp_ph})",
