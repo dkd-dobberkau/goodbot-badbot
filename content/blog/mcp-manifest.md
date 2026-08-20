@@ -94,9 +94,26 @@ deploy tooling, and a bare `curl`. One is `httpx`. One is CensysInspect, an
 internet-wide scanner that POSTs at everything it can reach. And one is
 Amazonbot — an identified AI crawler — which on 9 August sent a **`GET`**.
 
-That last detail is the finding. MCP is a POST interface. Amazonbot did not call
-the endpoint; it *crawled the URL*, treating an interface as if it were a
-document. **No AI agent has ever opened an MCP session with this server.**
+That last detail is the finding, and it is worth spelling out rather than
+asserting.
+
+Under the current protocol revision a `GET` is not a step in MCP at all. The
+spec requires exactly one thing of the endpoint — that it "supports POST" — and
+revision `2026-07-28` explicitly removed both the GET stream and protocol-level
+sessions, which earlier revisions did have. For a server that speaks only this
+revision the spec even prescribes the reply: `GET` or `DELETE` to the MCP
+endpoint gets a `405 Method Not Allowed`, which is what ours returns, with an
+`Allow: POST` header and an error naming the revision.
+
+There is exactly one path on which a bare `GET` would be legitimate: an old
+client probing whether this is a legacy HTTP+SSE server. But that fallback is
+ordered — the client **must POST first**, and only after a `400`, `404` or `405`
+comes back may it try a `GET`. Amazonbot never posted. One `GET`, on 9 August,
+and nothing else.
+
+So it did not call the endpoint; it *crawled the URL*, treating an interface as
+if it were a document. **No AI agent has ever opened an MCP session with this
+server.**
 
 Which means the experiment we designed — guessed the path, or followed a
 pointer? — never got to run, because nothing ever arrived to be classified.
@@ -122,4 +139,5 @@ and an operator name here.
 - [RFC 8615](https://www.rfc-editor.org/rfc/rfc8615.html) — well-known URIs, the registry the draft asks to be added to.
 - [An MCP endpoint nobody can find](/blog/mcp-endpoint) — the experiment this manifest ends.
 - [Grounding pages — something true to cite](/blog/grounding-pages) — where the no-theatre rule was written down.
+- [MCP Streamable HTTP transport](https://modelcontextprotocol.io/specification/2026-07-28/basic/transports/streamable-http) — the POST-only requirement, the removal of the GET stream in revision 2026-07-28, and the ordered legacy fallback.
 - [`/.well-known/mcp-server`](/.well-known/mcp-server) — the manifest itself.
