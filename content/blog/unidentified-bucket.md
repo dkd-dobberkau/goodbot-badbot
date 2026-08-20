@@ -116,6 +116,15 @@ noticed this and shrugged it off in a sentence: *"The two the dashboard shows
 are our own `curl` verifying the deploy."* We wrote it down and kept counting it
 anyway. A site that measures crawlers should not have itself in the numerator.
 
+The sharpest example only turned up while verifying the deploy of this very
+change. The dashboard had been reporting **1 HEAD probe** since August. There is
+exactly one `HEAD` row in the entire database, and it reads
+`probe-split-check/1.0` — the throwaway user-agent we used on 5 August to test
+that reads and probes were being counted separately. The probe column's only
+entry was the test that built it. It now reads zero, which is the honest number:
+since this site stopped answering `HEAD` with `405`, no crawler has probed a
+single file.
+
 **The bucket is now five classes**, assigned from the user-agent at query time.
 Nothing is stored, so improving the classifier reclassifies the entire history
 at once.
