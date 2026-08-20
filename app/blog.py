@@ -21,6 +21,7 @@ without the dependency installed.
 from __future__ import annotations
 
 import html as _html
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -167,6 +168,79 @@ def render_post_html(post: Post) -> str:
         "</main>"
     )
     return _page(post.title, content)
+
+
+SITE_BASE_URL = "https://goodbot-badbot.com"
+FEED_PATH = "/feed.xml"
+_ATOM_NS = "http://www.w3.org/2005/Atom"
+
+
+def _atom_timestamp(date: str) -> str:
+    """Turn a 'YYYY-MM-DD' frontmatter date into an RFC 3339 instant.
+
+    Posts carry a date but no time, and Atom requires a full timestamp. Midnight
+    UTC is the honest reading of "published that day"; inventing a time from the
+    file's mtime would make the feed churn on every redeploy.
+    """
+    day = (date or "").strip()[:10]
+    return f"{day}T00:00:00Z" if len(day) == 10 else "1970-01-01T00:00:00Z"
+
+
+def render_atom_feed(posts: list[Post] | None = None) -> str:
+    """Render the blog as an Atom 1.0 feed (RFC 4287).
+
+    Built with ElementTree rather than the f-string style used for sitemap.xml,
+    and deliberately so: the sitemap only ever interpolates slugs and dates,
+    while this document carries post titles and summaries — prose containing
+    ampersands, quotes and angle brackets. Letting the serialiser handle
+    escaping removes a whole class of malformed-output bug.
+
+    `posts` is injectable so the feed can be tested without the content
+    directory; it defaults to the live registry.
+    """
+    if posts is None:
+        posts = list_posts()
+
+    ET.register_namespace("", _ATOM_NS)
+    feed = ET.Element(f"{{{_ATOM_NS}}}feed")
+
+    def sub(parent, tag, text=None, **attrs):
+        el = ET.SubElement(parent, f"{{{_ATOM_NS}}}{tag}", attrs)
+        if text is not None:
+            el.text = text
+        return el
+
+    sub(feed, "title", "goodbot-badbot.com")
+    sub(feed, "subtitle", "Methodology notes and findings on AI-crawler compliance.")
+    sub(feed, "id", f"{SITE_BASE_URL}/")
+    sub(feed, "link", href=f"{SITE_BASE_URL}{FEED_PATH}", rel="self",
+        type="application/atom+xml")
+    sub(feed, "link", href=f"{SITE_BASE_URL}/blog", rel="alternate", type="text/html")
+    # Feed-level <updated> is the newest post, never "now": a feed that changes
+    # on every request tells readers to refetch when nothing has been published.
+    newest = max((p.date for p in posts if p.date), default="")
+    sub(feed, "updated", _atom_timestamp(newest))
+    author = sub(feed, "author")
+    sub(author, "name", "Olivier Dobberkau")
+
+    for post in posts:
+        url = f"{SITE_BASE_URL}/blog/{post.slug}"
+        entry = sub(feed, "entry")
+        sub(entry, "title", post.title)
+        sub(entry, "link", href=url, rel="alternate", type="text/html")
+        sub(entry, "id", url)
+        sub(entry, "updated", _atom_timestamp(post.date))
+        if post.summary:
+            sub(entry, "summary", post.summary)
+
+    # Indented to match sitemap.xml. Readers do not care, but people do open
+    # this URL in a browser, and a single 5 KB line is unreadable there.
+    ET.indent(feed, space="  ")
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        + ET.tostring(feed, encoding="unicode")
+        + "\n"
+    )
 
 
 def render_index_markdown() -> str:

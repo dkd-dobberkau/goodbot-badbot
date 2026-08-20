@@ -57,6 +57,7 @@ RATE_LIMIT_RULES = (
     ("/sitemap.xml",            60),
     ("/llms.txt",               60),
     ("/blog",                   60),
+    ("/feed.xml",               60),
     ("/facts",                  60),
     ("/AGENTS.md",              60),
     ("/agents.md",              60),
@@ -539,6 +540,29 @@ async def sitemap_xml(request: Request):
     return Response(content=_build_sitemap(), media_type="application/xml")
 
 
+@app.get("/feed.xml")
+async def feed_xml(request: Request):
+    """Atom feed for the blog.
+
+    Logged like the other meta surfaces, but deliberately *not* given a column
+    in Discovery Reads: a feed is fetched by ordinary feed readers as much as by
+    agents, so folding it into that table would dilute the one thing the table
+    is for. The rows are in `visits` if the question ever becomes interesting.
+    """
+    ip = request.client.host
+    ua = request.headers.get("user-agent", "")
+    if _should_log_meta_visit("/feed.xml", ua, request.method):
+        await log_visit(
+            app.state.db_pool, "/feed.xml", ua, ip, is_honeypot=False,
+            signature_status=request.state.signature_status,
+            method=request.method,
+        )
+    return Response(
+        content=blog.render_atom_feed(),
+        media_type="application/atom+xml; charset=utf-8",
+    )
+
+
 # ── Web Bot Auth: JWKS for outbound identity ────────────────────────────────
 
 # Ed25519 public key, published per the IETF WebBotAuth WG draft so receiving
@@ -867,6 +891,7 @@ Factual, machine-readable entity definitions for AI systems to cite:
 ## Writing
 
 - [Blog](https://goodbot-badbot.com/blog): methodology notes and findings
+- [Atom feed](https://goodbot-badbot.com/feed.xml): the same posts as a machine-readable feed
 
 ## Source code
 
