@@ -74,6 +74,19 @@ same clients that walk straight into the traps. The invitation and the trap have
 largely the same audience. That is not what we expected to find, and it is worth
 more than the reading we published in July.
 
+This one is now a panel rather than a paragraph. [Invitation &
+trap](/#trap-title) crosses the two surfaces per caller and leads with the
+share: **68.8 % of grounding-page reads come from callers that also walked into
+a honeypot** — 198 of 288 reads, from 29 of 48 callers.
+
+The table deliberately keeps the callers that came up clean, because the
+finding is a comparison and not a blocklist. SeznamBot, SemrushBot, AhrefsBot,
+Amazonbot, SERanking and Dataprovider have all read the facts pages and have
+never touched a trap — and some of them are among the heaviest readers on the
+list. The split is not "crawlers behave badly". It is that the clients which
+ignore `robots.txt` are also, right now, the most enthusiastic consumers of the
+thing we published for the ones that do not.
+
 One small forensic detail, since this project enjoys them. Several of the
 heaviest violators send `Safari/537.3` where every real browser sends
 `Safari/537.36` — a single missing character, in three otherwise different
@@ -162,6 +175,7 @@ reading it cannot make the same mistake as easily as we did.
 
 - [The files agents actually read](/blog/files-agents-actually-read) — the July post this one corrects.
 - [Discovery Reads](/) — the rebuilt table, live.
+- [Invitation & trap](/#trap-title) — the grounding-versus-honeypot crossing, live.
 - [`/api/stats`](/api/stats) — the raw JSON behind every number above.
 - [Dark Visitors](https://darkvisitors.com/agents) — the AI-crawler user-agent registry this site's curated list draws on.
 - [Cloudflare Radar's verified bots](https://radar.cloudflare.com/traffic/verified-bots) — the second source we merge in, and the one that was also missing DeepSeek.
