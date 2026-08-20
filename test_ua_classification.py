@@ -18,7 +18,12 @@ from app.bots import (
     classify_ua,
     is_self_tooling,
 )
-from app.main import _aggregate_discovery_rows
+from app.main import (
+    MAX_DISPLAYED_UA_LEN,
+    TRAP_OVERLAP_ROW_LIMIT,
+    _aggregate_discovery_rows,
+    _aggregate_trap_rows,
+)
 
 CLASSIFY_CASES = [
     # (user_agent, expected class, label)
@@ -125,7 +130,68 @@ def main() -> int:
     failures = check("no self-test reads leak into totals",
                      sum(r["total_reads"] for r in out), 9 + 12 + 10 + 7 + 30 + 3, failures)
 
-    total = len(CLASSIFY_CASES) + 13
+    # --- invitation vs trap overlap ---
+    PIXEL = ("Mozilla/5.0 (Linux; Android 12; Pixel 6) AppleWebKit/537.36 "
+             "(KHTML, like Gecko) Chrome/114.0.0.0 Mobile Safari/537.36")
+    IPHONE = ("Mozilla/5.0 (iPhone; CPU iPhone OS 13_2_3 like Mac OS X) "
+              "AppleWebKit/605.1.15 Version/13.0.3 Mobile/15E148 Safari/604.1")
+
+    def trap_row(ua, grounding, honeypots, ips):
+        return {"user_agent": ua, "grounding_reads": grounding,
+                "honeypot_hits": honeypots, "distinct_ips": ips}
+
+    trap_rows = [
+        # Two mOptimizer strings: one tool, must merge into a single caller.
+        trap_row("Mozilla/5.0 (Linux) Chrome/112.0.0.0 (compatible; mOptimizer/1.0)", 56, 192, 20),
+        trap_row("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                 "Chrome/148.0.0.0 Safari/537.36 mOptimizer/1.0/250303.095116", 11, 32, 9),
+        # Two distinct browser strings: must NOT merge — the string is the identity.
+        trap_row(PIXEL, 25, 123, 25),
+        trap_row(IPHONE, 24, 47, 23),
+        # Clean readers: read the invitation, never touched a trap.
+        trap_row("Mozilla/5.0 (compatible; SeznamBot/4.0; +https://o-seznam.cz/)", 21, 0, 13),
+        trap_row("Mozilla/5.0 (compatible; GPTBot/1.0; +https://openai.com/gptbot)", 9, 0, 4),
+        # Self-test must not appear at all.
+        trap_row("goodbot-badbot-deploy-check/1.0", 40, 5, 1),
+    ]
+    trap_display, trap_totals = _aggregate_trap_rows(trap_rows)
+    by_caller = {r["caller"]: r for r in trap_display}
+
+    failures = check("mOptimizer strings merged into one caller",
+                     by_caller["mOptimizer"]["grounding_reads"], 67, failures)
+    failures = check("merged caller sums honeypot hits",
+                     by_caller["mOptimizer"]["honeypot_hits"], 224, failures)
+    failures = check("browser strings stay separate",
+                     sum(1 for r in trap_display if r["bot_class"] == CLASS_BROWSER_UA),
+                     2, failures)
+    failures = check("self-test excluded from trap table",
+                     any("deploy-check" in r["user_agent"] for r in trap_display), False, failures)
+    failures = check("clean reader kept with zero hits",
+                     by_caller["SeznamBot"]["honeypot_hits"], 0, failures)
+    failures = check("ranked by grounding reads",
+                     trap_display[0]["caller"], "mOptimizer", failures)
+    # Totals must ignore the self-test row: 67+25+24+21+9 = 146 reads,
+    # of which 67+25+24 = 116 come from callers that also tripped a trap.
+    failures = check("total grounding reads", trap_totals["grounding_reads"], 146, failures)
+    failures = check("reads from violators", trap_totals["reads_from_violators"], 116, failures)
+    failures = check("violator share", trap_totals["violator_share"], 79.5, failures)
+    failures = check("violator caller count", trap_totals["violator_callers"], 3, failures)
+    failures = check("caller count", trap_totals["callers"], 5, failures)
+    # Long anonymous strings are truncated for display; named callers are not.
+    failures = check("long UA truncated",
+                     len(by_caller[[c for c in by_caller if c.endswith("…")][0]]["caller"]),
+                     MAX_DISPLAYED_UA_LEN, failures)
+    failures = check("truncated row keeps full UA for the title attribute",
+                     any(r["user_agent"] == PIXEL for r in trap_display), True, failures)
+
+    # Row limit must bound the table without touching the totals.
+    many = [trap_row(f"Bot{i}Crawler/1.0", 1, 1, 1) for i in range(TRAP_OVERLAP_ROW_LIMIT + 10)]
+    limited, limited_totals = _aggregate_trap_rows(many)
+    failures = check("display bounded by row limit", len(limited), TRAP_OVERLAP_ROW_LIMIT, failures)
+    failures = check("totals count every caller, not just displayed ones",
+                     limited_totals["callers"], TRAP_OVERLAP_ROW_LIMIT + 10, failures)
+
+    total = len(CLASSIFY_CASES) + 27
     print(f"\n{total - failures}/{total} passed")
     return 0 if failures == 0 else 1
 

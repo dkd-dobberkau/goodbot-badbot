@@ -1129,6 +1129,85 @@ def _aggregate_discovery_rows(rows) -> list[dict]:
     return sorted(grouped.values(), key=sort_key)
 
 
+# How many callers the invitation-vs-trap table shows. The tail is a long list
+# of browser strings with one read and a handful of honeypot hits each; the
+# headline share below the table covers all of them, so truncating the display
+# loses nothing but noise.
+TRAP_OVERLAP_ROW_LIMIT = 15
+
+# Longest raw user-agent shown in that table. Anonymous callers have no name to
+# print, so the string itself is the identity — but a 145-character Mozilla
+# incantation would wreck the column, and the full value stays in the title
+# attribute.
+MAX_DISPLAYED_UA_LEN = 46
+
+
+def _aggregate_trap_rows(rows) -> tuple[list[dict], dict]:
+    """Cross grounding-page reads with honeypot hits, per caller.
+
+    Returns (display rows, totals). Named callers merge by name — two
+    mOptimizer user-agent strings are one tool and reading them as two entries
+    understates it. Browser-shaped and unidentified callers keep one row per
+    raw string, because there the string *is* the identity and collapsing them
+    would destroy exactly the distinction this table exists to draw.
+    """
+    grouped: dict[tuple[str, str], dict] = {}
+    for row in rows:
+        ua = row.get("user_agent") or ""
+        ua_class, name, _ = classify_ua(ua)
+        if ua_class == CLASS_SELF:
+            continue
+        anonymous = ua_class in _COLLAPSED_CLASSES
+        key = (ua_class, ua if anonymous else name)
+        entry = grouped.get(key)
+        if entry is None:
+            entry = grouped[key] = {
+                "bot_class": ua_class,
+                "class_label": CLASS_LABELS[ua_class],
+                "caller": ua if anonymous else name,
+                "named": not anonymous,
+                "user_agent": ua,
+                "grounding_reads": 0,
+                "honeypot_hits": 0,
+                "distinct_ips": 0,
+            }
+        entry["grounding_reads"] += int(row.get("grounding_reads") or 0)
+        entry["honeypot_hits"] += int(row.get("honeypot_hits") or 0)
+        # Distinct-IP counts come from separate GROUP BY buckets, so they can
+        # only be summed, not deduplicated. For merged named callers this may
+        # double-count an address used by two of its user-agent strings; it is
+        # an upper bound, and the column is read as "many addresses or few",
+        # not as an exact population.
+        entry["distinct_ips"] += int(row.get("distinct_ips") or 0)
+
+    callers = sorted(
+        grouped.values(),
+        key=lambda e: (-e["grounding_reads"], -e["honeypot_hits"], e["caller"]),
+    )
+
+    total_reads = sum(e["grounding_reads"] for e in callers)
+    violators = [e for e in callers if e["honeypot_hits"] > 0]
+    reads_from_violators = sum(e["grounding_reads"] for e in violators)
+    totals = {
+        "grounding_reads": total_reads,
+        "callers": len(callers),
+        "violator_callers": len(violators),
+        "reads_from_violators": reads_from_violators,
+        # Rounded to one decimal for display; the raw counts above stay exact
+        # so nobody has to trust the percentage.
+        "violator_share": round(100 * reads_from_violators / total_reads, 1) if total_reads else 0.0,
+    }
+
+    display = []
+    for entry in callers[:TRAP_OVERLAP_ROW_LIMIT]:
+        shown = dict(entry)
+        caller = shown["caller"]
+        if not shown["named"] and len(caller) > MAX_DISPLAYED_UA_LEN:
+            shown["caller"] = caller[:MAX_DISPLAYED_UA_LEN - 1] + "…"
+        display.append(shown)
+    return display, totals
+
+
 async def _compute_stats() -> dict:
     async with app.state.db_pool.acquire() as conn:
         async with conn.cursor(aiomysql.DictCursor) as cur:
@@ -1242,6 +1321,28 @@ async def _compute_stats() -> dict:
             total_discovery = int(totals["read_count"] or 0)
             total_head_probes = int(totals["probe_count"] or 0)
 
+            # Invitation vs trap: for every caller that has read a grounding
+            # page, how often it also hit a honeypot. Grounding pages are the
+            # one surface offered freely — a read there is a positive signal —
+            # so the overlap with the traps is the sharpest thing this dataset
+            # says. HAVING keeps the scan to callers that actually read one;
+            # honeypot-only clients belong to the violation feed, not here.
+            await cur.execute(
+                f"""
+                SELECT COALESCE(user_agent, '') AS user_agent,
+                       CAST(SUM((path = '/facts' OR path LIKE '/facts/%%') AND {is_read})
+                            AS UNSIGNED) AS grounding_reads,
+                       CAST(SUM(is_honeypot = 1) AS UNSIGNED) AS honeypot_hits,
+                       CAST(COUNT(DISTINCT ip_hash) AS UNSIGNED) AS distinct_ips
+                FROM visits
+                GROUP BY COALESCE(user_agent, '')
+                HAVING grounding_reads > 0
+                ORDER BY grounding_reads DESC
+                LIMIT {DISCOVERY_UA_GROUP_LIMIT}
+                """
+            )
+            trap_overlap, trap_totals = _aggregate_trap_rows(await cur.fetchall())
+
     return {
         "summary": summary,
         "recent_violations": recent,
@@ -1251,6 +1352,8 @@ async def _compute_stats() -> dict:
         "discovery_reads": discovery,
         "total_discovery_reads": total_discovery,
         "total_head_probes": total_head_probes,
+        "trap_overlap": trap_overlap,
+        "trap_totals": trap_totals,
     }
 
 

@@ -553,6 +553,21 @@
     margin-left: 0.4rem;
   }
 
+  /* Invitation & trap table. A caller that never tripped a honeypot is the
+     control group, not missing data, so it reads green rather than dim. */
+  .read-count.violating { color: var(--red); }
+  .read-count.clean { color: var(--green); white-space: nowrap; }
+  /* --warn-text, not --yellow: the latter only clears 3.6:1 on the light
+     background. Identical in dark, where both are #ffd166. */
+  .read-count.many-ips { color: var(--warn-text); }
+
+  .caller-ua {
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    color: var(--muted);
+    cursor: help;
+  }
+
   .last-seen {
     font-family: var(--mono);
     font-size: 0.78rem;
@@ -808,6 +823,45 @@
   </table>
 </section>
 
+<section class="discovery-section">
+  <h2 class="panel-title" id="trap-title">Invitation &amp; trap — the callers that do both</h2>
+  <p class="discovery-intro">
+    A grounding page is the one thing this site hands out freely: a factual page,
+    linked openly, where a read is a <em>positive</em> signal. A honeypot is the
+    opposite — a path forbidden in <code>/robots.txt</code> and linked nowhere a
+    human would click. They are meant to separate two kinds of visitor. Crossing
+    them per caller shows how often they do not:
+    <strong id="trapShare">—</strong> of grounding-page reads come from callers
+    that also walked into a trap
+    (<strong id="trapReads">—</strong> of <strong id="trapTotalReads">—</strong>
+    reads, from <strong id="trapViolators">—</strong> of
+    <strong id="trapCallers">—</strong> callers).
+  </p>
+  <p class="discovery-intro">
+    The column that gives the game away is <em>IPs</em>. A caller with one
+    address is a crawler doing its job; a "browser" with 25 reads spread across
+    25 addresses is a proxy pool. Note the clean rows too — they are the reason
+    this table is not a blocklist. Named crawlers that read the facts and never
+    touched a trap are doing exactly what the invitation asks, and several of
+    the heaviest readers here are in that group. Anonymous callers have no name
+    to print, so they are listed by user-agent; hover for the full string.
+  </p>
+  <table aria-labelledby="trap-title">
+    <thead>
+      <tr>
+        <th scope="col">Class</th>
+        <th scope="col">Caller</th>
+        <th scope="col" style="text-align:right">Grounding reads</th>
+        <th scope="col" style="text-align:right">Honeypot hits</th>
+        <th scope="col" style="text-align:right">IPs</th>
+      </tr>
+    </thead>
+    <tbody id="trapTable">
+      <tr><td colspan="5" class="empty-state">Loading…</td></tr>
+    </tbody>
+  </table>
+</section>
+
 </main>
 
 <footer>
@@ -843,7 +897,9 @@ function getDemoData() {
     total_discovery_reads: 0,
     summary: [],
     recent_violations: [],
-    discovery_reads: []
+    discovery_reads: [],
+    trap_overlap: [],
+    trap_totals: {}
   };
 }
 
@@ -961,6 +1017,44 @@ function renderStats(data) {
         ${cell(probes)}
         <td class="read-count nonzero">${total}</td>
         <td class="last-seen">${esc(lastRead)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  const trapTotals = data.trap_totals || {};
+  const setText = (id, value) => { document.getElementById(id).textContent = value; };
+  setText('trapShare', (Number(trapTotals.violator_share) || 0).toFixed(1) + ' %');
+  setText('trapReads', (Number(trapTotals.reads_from_violators) || 0).toLocaleString());
+  setText('trapTotalReads', (Number(trapTotals.grounding_reads) || 0).toLocaleString());
+  setText('trapViolators', (Number(trapTotals.violator_callers) || 0).toLocaleString());
+  setText('trapCallers', (Number(trapTotals.callers) || 0).toLocaleString());
+
+  const trapTable = document.getElementById('trapTable');
+  const trapRows = data.trap_overlap || [];
+  if (trapRows.length === 0) {
+    trapTable.innerHTML = `<tr><td colspan="5" class="empty-state">No grounding-page reads logged yet.</td></tr>`;
+  } else {
+    trapTable.innerHTML = trapRows.map(row => {
+      const reads = Number(row.grounding_reads) || 0;
+      const hits = Number(row.honeypot_hits) || 0;
+      const ips = Number(row.distinct_ips) || 0;
+      const botClass = String(row.bot_class || 'unknown').replace(/[^a-z_]/g, '');
+      // A clean reader is the point of comparison, not an absence of data —
+      // so it gets a green dash rather than the dim one used for empty cells.
+      const hitCell = hits > 0
+        ? `<td class="read-count violating">${hits}</td>`
+        : `<td class="read-count clean" title="Never hit a honeypot">— clean</td>`;
+      // Anonymous callers are shown as a truncated user-agent; the full string
+      // goes in the title so the row stays verifiable.
+      const caller = row.named
+        ? `<span class="bot-name">${esc(row.caller)}</span>`
+        : `<span class="caller-ua" title="${esc(row.user_agent)}">${esc(row.caller)}</span>`;
+      return `<tr>
+        <td><span class="class-badge ${botClass}">${esc(row.class_label)}</span></td>
+        <td>${caller}</td>
+        <td class="read-count nonzero">${reads}</td>
+        ${hitCell}
+        <td class="read-count ${ips > 1 ? 'many-ips' : 'zero'}">${ips}</td>
       </tr>`;
     }).join('');
   }
