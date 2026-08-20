@@ -33,6 +33,11 @@
     --verdict-bad-border: rgba(255,59,59,0.2);
     --verdict-good-bg: rgba(0,255,135,0.08);
     --verdict-good-border: rgba(0,255,135,0.15);
+    --verdict-warn-bg: rgba(255,209,102,0.1);
+    --verdict-warn-border: rgba(255,209,102,0.22);
+    /* Badge text sits on the tint above, so it needs its own token: plain
+       --yellow only clears 3.2:1 against the light-theme tint. */
+    --warn-text: #ffd166;
   }
 
   [data-theme="light"] {
@@ -53,6 +58,9 @@
     --verdict-bad-border: rgba(216,38,31,0.25);
     --verdict-good-bg: rgba(0,160,90,0.08);
     --verdict-good-border: rgba(0,160,90,0.25);
+    --verdict-warn-bg: rgba(176,122,0,0.1);
+    --verdict-warn-border: rgba(176,122,0,0.3);
+    --warn-text: #7a5500;
   }
 
   :root {
@@ -508,6 +516,43 @@
   .read-count.zero { color: var(--dim); }
   .read-count.nonzero { color: var(--green); }
 
+  /* Class badge for the Discovery Reads taxonomy. Only "AI crawler" gets the
+     positive colour — it is the one class that answers the question the panel
+     asks. "Browser UA" is warned rather than neutral because the string is a
+     claim the site cannot verify. */
+  .class-badge {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.02em;
+    padding: 0.12rem 0.4rem;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .class-badge.ai {
+    color: var(--green);
+    border-color: var(--verdict-good-border);
+    background: var(--verdict-good-bg);
+  }
+
+  .class-badge.browser_ua {
+    color: var(--warn-text);
+    border-color: var(--verdict-warn-border);
+    background: var(--verdict-warn-bg);
+  }
+
+  .class-badge.unknown { color: var(--dim); }
+
+  .ua-count {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--dim);
+    margin-left: 0.4rem;
+  }
+
   .last-seen {
     font-family: var(--mono);
     font-size: 0.78rem;
@@ -715,6 +760,23 @@
     <strong id="probeTotal">—</strong> HEAD probes.
   </p>
   <p class="discovery-intro">
+    <strong>Who is actually reading.</strong> Every caller is sorted into one
+    class, because lumping them together was actively misleading: the single
+    <em>Unidentified</em> row this table used to show accounted for 92 % of all
+    discovery reads, and almost none of it was an AI agent. <em>AI crawler</em>
+    is a bot from the registry this site tracks. <em>Non-AI crawler</em> is a
+    self-declared SEO, search-engine or scanning bot — legitimate, just not
+    what is being measured here. <em>HTTP client</em> is a scripted request
+    (curl, httpx, Go) that names a library and nothing else; it is the most
+    ambiguous class, since an LLM agent driving a script looks exactly like a
+    shell one-liner. <em>Browser UA</em> means only that the string claims to
+    be a browser — <strong>not</strong> that a person was driving it. Several
+    of the heaviest grounding readers in that class rotate through 20+ IP
+    addresses at roughly one request each and also walk straight into the
+    honeypots. This site's own deploy and verification requests are excluded
+    entirely; measuring them would be measuring ourselves.
+  </p>
+  <p class="discovery-intro">
     <strong>Reads vs. probes.</strong> A <code>HEAD</code> request asks whether
     a file exists without taking the bytes — a crawler checking freshness or
     testing the waters, not consuming the content. Those are counted separately
@@ -726,6 +788,7 @@
   <table aria-labelledby="discovery-title">
     <thead>
       <tr>
+        <th scope="col">Class</th>
         <th scope="col">Bot</th>
         <th scope="col">Operator</th>
         <th scope="col" style="text-align:right">llms.txt</th>
@@ -740,7 +803,7 @@
       </tr>
     </thead>
     <tbody id="discoveryTable">
-      <tr><td colspan="11" class="empty-state">Loading…</td></tr>
+      <tr><td colspan="12" class="empty-state">Loading…</td></tr>
     </tbody>
   </table>
 </section>
@@ -860,7 +923,7 @@ function renderStats(data) {
   const discTable = document.getElementById('discoveryTable');
   const discovery = data.discovery_reads || [];
   if (discovery.length === 0) {
-    discTable.innerHTML = `<tr><td colspan="11" class="empty-state">No discovery reads logged yet.</td></tr>`;
+    discTable.innerHTML = `<tr><td colspan="12" class="empty-state">No discovery reads logged yet.</td></tr>`;
   } else {
     discTable.innerHTML = discovery.map(row => {
       const llms = Number(row.llms_reads) || 0;
@@ -875,8 +938,19 @@ function renderStats(data) {
       const lastRead = row.last_seen
         ? new Date(row.last_seen + 'Z').toLocaleString('en-GB')
         : '—';
+      // Collapsed classes (Browser UA, Unidentified) are one row standing in
+      // for many distinct strings. Those have no bot name to show — repeating
+      // the class badge in the Bot column would just be the same word twice —
+      // so the cell reports how many user agents the row speaks for instead.
+      const uaCount = Number(row.ua_count) || 0;
+      const botClass = String(row.bot_class || 'unknown').replace(/[^a-z_]/g, '');
+      const nameCell = row.bot_name === row.class_label
+        ? `<span class="ua-count">${uaCount} distinct UA${uaCount === 1 ? '' : 's'}</span>`
+        : `<span class="bot-name">${esc(row.bot_name)}</span>` +
+          (uaCount > 1 ? `<span class="ua-count">${uaCount} UAs</span>` : '');
       return `<tr>
-        <td><span class="bot-name">${esc(row.bot_name)}</span></td>
+        <td><span class="class-badge ${botClass}">${esc(row.class_label)}</span></td>
+        <td>${nameCell}</td>
         <td><span class="operator">${esc(row.operator)}</span></td>
         ${cell(llms)}
         ${cell(agents)}

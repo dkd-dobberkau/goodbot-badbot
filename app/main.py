@@ -11,7 +11,6 @@ import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from pathlib import Path
 
 import aiomysql
 import http_sfv
@@ -27,6 +26,21 @@ from http_message_signatures import (
 )
 
 from app import blog, facts, mcp
+
+# The UA taxonomy lives in app.bots. identify_bot and KNOWN_BOTS are re-exported
+# here because both are part of this module's established import surface.
+from app.bots import (  # noqa: F401  (re-exported)
+    CLASS_BROWSER_UA,
+    CLASS_LABELS,
+    CLASS_ORDER,
+    CLASS_SELF,
+    CLASS_UNKNOWN,
+    KNOWN_BOTS,
+    SELF_TOOLING_UA_MARKERS,
+    classify_ua,
+    identify_bot,
+    is_self_tooling,
+)
 
 # Hard caps to keep oversized inputs from blowing past column limits or
 # bloating the DB. VARCHAR(512) is the path column; UA TEXT is generous.
@@ -61,103 +75,6 @@ RATE_LIMIT_RULES = (
 )
 
 SITE_BASE_URL = "https://goodbot-badbot.com"
-
-# Known AI crawlers: (user-agent substring, display name, operator).
-# Substring match runs in insertion order — longer/more-specific keys MUST
-# come before shorter ones that they contain (applebot-extended before
-# applebot, etc.).
-KNOWN_BOTS = {
-    # OpenAI
-    "gptbot":                          ("GPTBot",              "OpenAI"),
-    "chatgpt-agent":                   ("ChatGPT-Agent",       "OpenAI"),
-    "chatgpt-user":                    ("ChatGPT-User",        "OpenAI"),
-    "oai-searchbot":                   ("OAI-SearchBot",       "OpenAI"),
-    # Anthropic
-    "claudebot":                       ("ClaudeBot",           "Anthropic"),
-    "claude-user":                     ("Claude-User",         "Anthropic"),
-    "claude-code":                     ("Claude-Code",         "Anthropic"),
-    "claude-web":                      ("Claude-Web",          "Anthropic"),
-    "anthropic-ai":                    ("anthropic-ai",        "Anthropic"),
-    # Google
-    "google-extended":                 ("Google-Extended",     "Google"),
-    "googleother":                     ("GoogleOther",         "Google"),
-    "gemini-deep-research":            ("Gemini-Deep-Research", "Google"),
-    "google-notebooklm":               ("NotebookLM",          "Google"),
-    # Apple — extended MUST come before the generic applebot match
-    "applebot-extended":               ("Applebot-Extended",   "Apple"),
-    "applebot":                        ("Applebot",            "Apple"),
-    # Meta
-    "meta-externalagent":              ("Meta-ExternalAgent",  "Meta"),
-    "meta-externalfetcher":            ("Meta-ExternalFetcher", "Meta"),
-    "facebookbot":                     ("FacebookBot",         "Meta"),
-    # Perplexity
-    "perplexitybot":                   ("PerplexityBot",       "Perplexity"),
-    "perplexity-user":                 ("Perplexity-User",     "Perplexity"),
-    # Amazon
-    "amazonbot":                       ("Amazonbot",           "Amazon"),
-    "novaact":                         ("Nova Act",            "Amazon"),
-    # ByteDance
-    "bytespider":                      ("Bytespider",          "ByteDance"),
-    # Cohere — full crawler name MUST come before the generic cohere-ai match
-    "cohere-training-data-crawler":    ("Cohere-Training-Data-Crawler", "Cohere"),
-    "cohere-ai":                       ("cohere-ai",           "Cohere"),
-    # Mistral
-    "mistralai-user":                  ("MistralAI-User",      "Mistral"),
-    # DuckDuckGo
-    "duckassistbot":                   ("DuckAssistBot",       "DuckDuckGo"),
-    # Common Crawl / data crawlers
-    "ccbot":                           ("CCBot",               "Common Crawl"),
-    "diffbot":                         ("Diffbot",             "Diffbot"),
-    "omgili":                          ("Omgili",              "Webz.io"),
-    "webzio-extended":                 ("Webzio-Extended",     "Webz.io"),
-    # Other AI search / fetchers
-    "youbot":                          ("YouBot",              "You.com"),
-    "iaskspider":                      ("IaskSpider",          "iAsk"),
-    "phindbot":                        ("PhindBot",            "Phind"),
-    "bravebot":                        ("BraveBot",            "Brave"),
-    "kagi-fetcher":                    ("Kagi-Fetcher",        "Kagi"),
-    "linerbot":                        ("LinerBot",            "Liner"),
-    "exabot":                          ("ExaBot",              "Exa"),
-    "tavilybot":                       ("TavilyBot",           "Tavily"),
-    "firecrawlagent":                  ("FirecrawlAgent",      "Firecrawl"),
-    "chatglm-spider":                  ("ChatGLM-Spider",      "Zhipu AI"),
-    # Agentic frameworks / IDE tools
-    "devin":                           ("Devin",               "Cognition"),
-    "manus-user":                      ("Manus-User",          "Manus"),
-    "apifybot":                        ("ApifyBot",            "Apify"),
-}
-
-# Extend KNOWN_BOTS with Cloudflare Radar's verified-bots directory, scoped to
-# the three AI categories. The dataset is vendored next to this file; refresh
-# with: curl -sL https://raw.githubusercontent.com/microlinkhq/cloudflare-bot-directory/master/src/index.json -o app/cf_bots.json
-# Patterns that overlap with the curated entries above are dropped so the
-# longer-first matching invariant (e.g. applebot-extended before applebot) holds.
-_CF_BOTS_FILE = Path(__file__).parent / "cf_bots.json"
-_CF_AI_CATEGORIES = {"AI_CRAWLER", "AI_ASSISTANT", "AI_SEARCH"}
-
-
-def _load_cf_bot_additions(known: dict[str, tuple[str, str]]) -> dict[str, tuple[str, str]]:
-    try:
-        entries = json.loads(_CF_BOTS_FILE.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return {}
-    additions: dict[str, tuple[str, str]] = {}
-    for bot in entries:
-        if bot.get("category") not in _CF_AI_CATEGORIES:
-            continue
-        name = bot.get("name") or bot.get("slug")
-        operator = bot.get("operator") or "Unknown"
-        for raw in bot.get("userAgentPatterns") or []:
-            pattern = raw.lower().strip().rstrip("/")
-            if not pattern or pattern in known:
-                continue
-            if any(k in pattern or pattern in k for k in known):
-                continue
-            additions.setdefault(pattern, (name, operator))
-    return dict(sorted(additions.items(), key=lambda kv: -len(kv[0])))
-
-
-KNOWN_BOTS.update(_load_cf_bot_additions(KNOWN_BOTS))
 
 # Honeypot paths (blocked in robots.txt)
 HONEYPOT_PATHS = [
@@ -259,16 +176,6 @@ async def _ensure_added_columns(cur):
             await cur.execute(ddl)
 
 
-def identify_bot(user_agent: str) -> tuple[str | None, str | None, str | None]:
-    if not user_agent:
-        return None, None, None
-    ua_lower = user_agent.lower()
-    for key, (name, operator) in KNOWN_BOTS.items():
-        if key in ua_lower:
-            return key, name, operator
-    return None, None, None
-
-
 async def log_visit(
     pool,
     path: str,
@@ -280,6 +187,11 @@ async def log_visit(
 ):
     path = (path or "")[:MAX_PATH_LEN]
     user_agent = (user_agent or "")[:MAX_UA_LEN]
+    # Our own deploy/verification probes are not visitors. Dropping them here —
+    # the single choke point every call site funnels through, honeypots
+    # included — keeps the dashboard from measuring itself.
+    if is_self_tooling(user_agent):
+        return
     method = (method or "")[:8].upper() or None
     bot_key, bot_name, operator = identify_bot(user_agent)
     ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
@@ -309,6 +221,11 @@ META_DEDUP_TTL_S = 600
 
 
 def _should_log_meta_visit(path: str, user_agent: str, method: str = "GET") -> bool:
+    # Cheap pre-filter for our own probes, so they never reach log_visit's
+    # guard and never take a slot in the dedup cache. log_visit stays
+    # authoritative — this is an optimisation, not the enforcement point.
+    if is_self_tooling(user_agent):
+        return False
     bot_key, _, _ = identify_bot(user_agent)
     identity = bot_key or hashlib.sha256((user_agent or "").encode()).hexdigest()[:16]
     key = (path, (method or "GET").upper(), identity)
@@ -1143,6 +1060,74 @@ STATS_TTL_S = 5
 _stats_cache: dict = {"ts": 0.0, "data": None}
 _stats_lock = asyncio.Lock()
 
+# Upper bound on how many distinct user agents the discovery query groups over.
+# Today the whole site has seen ~150 distinct UAs, so this is roughly 3× the
+# entire history — it exists purely so a future UA-randomising crawler cannot
+# turn one dashboard poll into a hundred-thousand-row result set. Only the
+# per-class breakdown would be affected by hitting it; the headline totals are
+# computed by a separate un-grouped query.
+DISCOVERY_UA_GROUP_LIMIT = 500
+
+# Per-surface count columns, in table order. Named once so the aggregator and
+# the empty-row template cannot drift apart.
+_DISCOVERY_COUNT_FIELDS = (
+    "llms_reads", "agents_reads", "facts_reads",
+    "catalog_reads", "ard_reads", "mcp_calls",
+    "total_reads", "head_probes",
+)
+
+# Classes whose members are reported as one aggregate row rather than one row
+# per name. A "Browser UA" row per distinct Chrome build would be dozens of
+# near-identical lines carrying no information; the AI and crawler classes, by
+# contrast, are worth naming individually because the name is the finding.
+_COLLAPSED_CLASSES = frozenset({CLASS_BROWSER_UA, CLASS_UNKNOWN})
+
+
+def _aggregate_discovery_rows(rows) -> list[dict]:
+    """Fold per-user-agent discovery counts into classified display rows.
+
+    Self-test traffic is dropped outright — log_visit stops recording it going
+    forward, and this hides the rows written before that guard existed, so the
+    panel reads consistently across the whole history.
+    """
+    grouped: dict[tuple[str, str, str], dict] = {}
+    for row in rows:
+        ua_class, name, operator = classify_ua(row.get("user_agent") or "")
+        if ua_class == CLASS_SELF:
+            continue
+        if ua_class in _COLLAPSED_CLASSES:
+            name, operator = CLASS_LABELS[ua_class], "—"
+        key = (ua_class, name, operator)
+        entry = grouped.get(key)
+        if entry is None:
+            entry = grouped[key] = {
+                "bot_class": ua_class,
+                "class_label": CLASS_LABELS[ua_class],
+                "bot_name": name,
+                "operator": operator,
+                "ua_count": 0,
+                "last_seen": None,
+                **{field: 0 for field in _DISCOVERY_COUNT_FIELDS},
+            }
+        entry["ua_count"] += 1
+        for field in _DISCOVERY_COUNT_FIELDS:
+            entry[field] += int(row.get(field) or 0)
+        last_seen = row.get("last_seen")
+        if last_seen is not None and (entry["last_seen"] is None or last_seen > entry["last_seen"]):
+            entry["last_seen"] = last_seen
+
+    # Sort by class first so the table reads as a taxonomy rather than a
+    # leaderboard, then by total events — reads plus probes, so a caller that
+    # only ever HEAD-probes still sorts on its actual activity.
+    def sort_key(entry: dict):
+        try:
+            class_rank = CLASS_ORDER.index(entry["bot_class"])
+        except ValueError:
+            class_rank = len(CLASS_ORDER)
+        return (class_rank, -(entry["total_reads"] + entry["head_probes"]), entry["bot_name"])
+
+    return sorted(grouped.values(), key=sort_key)
+
 
 async def _compute_stats() -> dict:
     async with app.state.db_pool.acquire() as conn:
@@ -1179,10 +1164,16 @@ async def _compute_stats() -> dict:
             await cur.execute("SELECT COUNT(*) AS c FROM visits WHERE signature_status = 'verified'")
             total_verified = (await cur.fetchone())["c"]
 
-            # Discovery reads: per known bot, how many times it fetched the
-            # LLM/agent discovery files. llms.txt and the three agents.md probe
-            # locations are reported as two columns. Placeholders are built from
-            # the path tuples so the value list stays parameterised.
+            # Discovery reads: how many times each caller fetched the LLM/agent
+            # discovery files. llms.txt and the three agents.md probe locations
+            # are reported as two columns. Placeholders are built from the path
+            # tuples so the value list stays parameterised.
+            #
+            # Grouping is by user_agent, not by bot_name, because bot_name is
+            # NULL for everything outside the AI registry and collapsing all of
+            # those into one "Unidentified" row hid 92 % of the traffic behind a
+            # single meaningless label. _aggregate_discovery_rows() classifies
+            # each UA and folds the groups back into display rows.
             #
             # A HEAD request is a *probe*, not a read: the crawler asked whether
             # the file exists and never took the bytes. Every per-surface column
@@ -1199,8 +1190,7 @@ async def _compute_stats() -> dict:
             is_read = "(method IS NULL OR method <> 'HEAD')"
             await cur.execute(
                 f"""
-                SELECT COALESCE(bot_name, 'Unidentified') AS bot_name,
-                       COALESCE(operator, '—') AS operator,
+                SELECT COALESCE(user_agent, '') AS user_agent,
                        CAST(SUM(path = '/llms.txt' AND {is_read}) AS UNSIGNED) AS llms_reads,
                        CAST(SUM(path IN ({agents_ph}) AND {is_read}) AS UNSIGNED) AS agents_reads,
                        CAST(SUM((path = '/facts' OR path LIKE '/facts/%%') AND {is_read}) AS UNSIGNED) AS facts_reads,
@@ -1213,14 +1203,14 @@ async def _compute_stats() -> dict:
                 FROM visits
                 WHERE path IN ({discovery_ph}) OR path = '/facts' OR path LIKE '/facts/%%'
                    OR path IN ({catalog_ph}) OR path IN ({ard_ph}) OR path IN ({mcp_ph})
-                GROUP BY COALESCE(bot_name, 'Unidentified'), COALESCE(operator, '—')
+                GROUP BY COALESCE(user_agent, '')
                 ORDER BY COUNT(*) DESC, last_seen DESC
-                LIMIT 50
+                LIMIT {DISCOVERY_UA_GROUP_LIMIT}
                 """,
                 (*AGENTS_MD_PATHS, *API_CATALOG_PATHS, *ARD_CATALOG_PATHS, *MCP_PATHS,
                  *DISCOVERY_PATHS, *API_CATALOG_PATHS, *ARD_CATALOG_PATHS, *MCP_PATHS),
             )
-            discovery = await cur.fetchall()
+            discovery = _aggregate_discovery_rows(await cur.fetchall())
 
             # Ordering is by total events (reads + probes) so a bot that only
             # ever HEAD-probes cannot be pushed off the LIMIT by having zero
@@ -1228,13 +1218,25 @@ async def _compute_stats() -> dict:
             # NB: `reads` is a reserved word in MySQL (READS SQL DATA), so the
             # aliases here are read_count/probe_count rather than the obvious
             # reads/probes.
+            #
+            # The totals stay a separate un-grouped query so they remain exact
+            # even if a UA-randomising crawler ever pushes the grouped query
+            # above into its LIMIT. Self-test rows logged before log_visit
+            # started dropping them are excluded here too, so the headline
+            # number matches the sum of the table.
+            self_ua_filter = " ".join(
+                ["AND COALESCE(user_agent, '') NOT LIKE %s"] * len(SELF_TOOLING_UA_MARKERS)
+            )
+            self_ua_values = tuple(f"%{marker}%" for marker in SELF_TOOLING_UA_MARKERS)
             await cur.execute(
                 f"SELECT CAST(SUM({is_read}) AS UNSIGNED) AS read_count, "
                 f"       CAST(COALESCE(SUM(method = 'HEAD'), 0) AS UNSIGNED) AS probe_count "
                 f"FROM visits "
-                f"WHERE path IN ({discovery_ph}) OR path = '/facts' OR path LIKE '/facts/%%' "
-                f"OR path IN ({catalog_ph}) OR path IN ({ard_ph}) OR path IN ({mcp_ph})",
-                (*DISCOVERY_PATHS, *API_CATALOG_PATHS, *ARD_CATALOG_PATHS, *MCP_PATHS),
+                f"WHERE (path IN ({discovery_ph}) OR path = '/facts' OR path LIKE '/facts/%%' "
+                f"OR path IN ({catalog_ph}) OR path IN ({ard_ph}) OR path IN ({mcp_ph})) "
+                f"{self_ua_filter}",
+                (*DISCOVERY_PATHS, *API_CATALOG_PATHS, *ARD_CATALOG_PATHS, *MCP_PATHS,
+                 *self_ua_values),
             )
             totals = await cur.fetchone()
             total_discovery = int(totals["read_count"] or 0)
