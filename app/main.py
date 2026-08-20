@@ -64,6 +64,7 @@ RATE_LIMIT_RULES = (
     ("/.well-known/agents.md",  60),
     ("/.well-known/api-catalog", 60),
     ("/.well-known/ai-catalog.json", 60),
+    ("/.well-known/mcp-server", 60),
     ("/mcp",                    60),
     ("/openapi.json",           60),
     ("/.well-known/http-message-signatures-directory", 60),
@@ -122,6 +123,16 @@ ARD_CATALOG_PATHS = ("/.well-known/ai-catalog.json",)
 # ai-catalog.json first followed an advertisement. Both are logged under the
 # same path, so the two cases are separated by query, not by schema.
 MCP_PATHS = ("/mcp",)
+
+# MCP discovery manifest (draft-serra-mcp-discovery-uri-04). A sixth discovery
+# signal and a direct answer to the asymmetry described above: MCP was the one
+# interface here that no specification told an agent how to find. One now
+# exists — an individual Internet-Draft with no IETF standing, expiring in
+# September 2026 — so the site publishes it and measures whether anything ever
+# asks. Kept in its own column rather than folded into the ARD catalog: they
+# are two different manifests, and merging distinct surfaces into one number is
+# the exact mistake the Discovery Reads split was written to undo.
+MCP_MANIFEST_PATHS = ("/.well-known/mcp-server",)
 
 
 DB_CONFIG = {
@@ -735,6 +746,30 @@ async def ai_catalog(request: Request):
     )
 
 
+@app.get("/.well-known/mcp-server", include_in_schema=False)
+async def mcp_server_manifest(request: Request):
+    """Discovery manifest telling an agent that /mcp exists and how to call it.
+
+    Served as application/json per draft-serra-mcp-discovery-uri-04 §6. Like the
+    API and ARD catalogs this is an offer, never a rule: not fetching it is not
+    a violation, and the column it feeds is expected to read zero for a long
+    time. That silence is the measurement.
+    """
+    ip = request.client.host
+    ua = request.headers.get("user-agent", "")
+    if _should_log_meta_visit("/.well-known/mcp-server", ua, request.method):
+        await log_visit(
+            app.state.db_pool, "/.well-known/mcp-server", ua, ip, is_honeypot=False,
+            signature_status=request.state.signature_status,
+            method=request.method,
+        )
+    return JSONResponse(
+        content=mcp.build_mcp_manifest(),
+        media_type="application/json",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
 # ── /mcp (Model Context Protocol, revision 2026-07-28) ───────────────────────
 
 # The protocol logic lives in app/mcp.py as a pure function; this route is only
@@ -870,6 +905,7 @@ trips a honeypot, where its visit is recorded.
 - [API catalog](https://goodbot-badbot.com/.well-known/api-catalog): RFC 9264 linkset pointing to the JSON stats API and its OpenAPI description
 - [AI catalog](https://goodbot-badbot.com/.well-known/ai-catalog.json): Agentic Resource Discovery manifest so registries can index the stats API
 - [MCP endpoint](https://goodbot-badbot.com/mcp): stateless Model Context Protocol server (revision 2026-07-28, POST only) exposing two read-only tools — `get_compliance_stats` and `check_bot`
+- [MCP server manifest](https://goodbot-badbot.com/.well-known/mcp-server): discovery manifest for the endpoint above, per draft-serra-mcp-discovery-uri (an individual Internet-Draft, not a ratified standard)
 - [robots.txt](https://goodbot-badbot.com/robots.txt): the honeypot rules
 
 ## Grounding pages
@@ -1097,7 +1133,8 @@ DISCOVERY_UA_GROUP_LIMIT = 500
 # the empty-row template cannot drift apart.
 _DISCOVERY_COUNT_FIELDS = (
     "llms_reads", "agents_reads", "facts_reads",
-    "catalog_reads", "ard_reads", "mcp_calls",
+    # Manifest before calls: an agent discovers the endpoint, then invokes it.
+    "catalog_reads", "ard_reads", "mcp_manifest_reads", "mcp_calls",
     "total_reads", "head_probes",
 )
 
@@ -1291,6 +1328,7 @@ async def _compute_stats() -> dict:
             catalog_ph = ",".join(["%s"] * len(API_CATALOG_PATHS))
             ard_ph = ",".join(["%s"] * len(ARD_CATALOG_PATHS))
             mcp_ph = ",".join(["%s"] * len(MCP_PATHS))
+            manifest_ph = ",".join(["%s"] * len(MCP_MANIFEST_PATHS))
             is_read = "(method IS NULL OR method <> 'HEAD')"
             await cur.execute(
                 f"""
@@ -1301,18 +1339,22 @@ async def _compute_stats() -> dict:
                        CAST(SUM(path IN ({catalog_ph}) AND {is_read}) AS UNSIGNED) AS catalog_reads,
                        CAST(SUM(path IN ({ard_ph}) AND {is_read}) AS UNSIGNED) AS ard_reads,
                        CAST(SUM(path IN ({mcp_ph}) AND {is_read}) AS UNSIGNED) AS mcp_calls,
+                       CAST(SUM(path IN ({manifest_ph}) AND {is_read}) AS UNSIGNED) AS mcp_manifest_reads,
                        CAST(SUM({is_read}) AS UNSIGNED) AS total_reads,
                        CAST(COALESCE(SUM(method = 'HEAD'), 0) AS UNSIGNED) AS head_probes,
                        MAX(ts) AS last_seen
                 FROM visits
                 WHERE path IN ({discovery_ph}) OR path = '/facts' OR path LIKE '/facts/%%'
                    OR path IN ({catalog_ph}) OR path IN ({ard_ph}) OR path IN ({mcp_ph})
+                   OR path IN ({manifest_ph})
                 GROUP BY COALESCE(user_agent, '')
                 ORDER BY COUNT(*) DESC, last_seen DESC
                 LIMIT {DISCOVERY_UA_GROUP_LIMIT}
                 """,
                 (*AGENTS_MD_PATHS, *API_CATALOG_PATHS, *ARD_CATALOG_PATHS, *MCP_PATHS,
-                 *DISCOVERY_PATHS, *API_CATALOG_PATHS, *ARD_CATALOG_PATHS, *MCP_PATHS),
+                 *MCP_MANIFEST_PATHS,
+                 *DISCOVERY_PATHS, *API_CATALOG_PATHS, *ARD_CATALOG_PATHS, *MCP_PATHS,
+                 *MCP_MANIFEST_PATHS),
             )
             discovery = _aggregate_discovery_rows(await cur.fetchall())
 
@@ -1337,10 +1379,11 @@ async def _compute_stats() -> dict:
                 f"       CAST(COALESCE(SUM(method = 'HEAD'), 0) AS UNSIGNED) AS probe_count "
                 f"FROM visits "
                 f"WHERE (path IN ({discovery_ph}) OR path = '/facts' OR path LIKE '/facts/%%' "
-                f"OR path IN ({catalog_ph}) OR path IN ({ard_ph}) OR path IN ({mcp_ph})) "
+                f"OR path IN ({catalog_ph}) OR path IN ({ard_ph}) OR path IN ({mcp_ph}) "
+                f"OR path IN ({manifest_ph})) "
                 f"{self_ua_filter}",
                 (*DISCOVERY_PATHS, *API_CATALOG_PATHS, *ARD_CATALOG_PATHS, *MCP_PATHS,
-                 *self_ua_values),
+                 *MCP_MANIFEST_PATHS, *self_ua_values),
             )
             totals = await cur.fetchone()
             total_discovery = int(totals["read_count"] or 0)

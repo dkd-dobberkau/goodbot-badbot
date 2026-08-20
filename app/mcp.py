@@ -46,6 +46,55 @@ SERVER_INSTRUCTIONS = (
     "observational and public; there is nothing to write here."
 )
 
+SITE_BASE_URL = "https://goodbot-badbot.com"
+
+# Discovery manifest for /.well-known/mcp-server, per
+# draft-serra-mcp-discovery-uri-04 §6.
+#
+# Status matters here and is the reason this exists at all: that draft is an
+# *individual* Internet-Draft. The IETF states plainly that it "is not endorsed
+# by the IETF and has no formal standing in the IETF standards process", it has
+# not been adopted by any working group, and revision 04 expires in September
+# 2026. So this is not compliance with a standard — it is this site doing what
+# it did with the API catalog and the ARD manifest: publishing an offer far
+# ahead of any ecosystem that would consume it, and then measuring the silence.
+#
+# Until now MCP was the one interface here that nothing advertised by path;
+# /mcp was announced only in llms.txt, agents.md and the ARD manifest. This
+# adds a fourth announcement channel, and it is the first one specified by
+# anybody outside this project.
+
+
+def build_mcp_manifest() -> dict:
+    """Return the /.well-known/mcp-server manifest.
+
+    Every field is checked against what the server actually does rather than
+    what would look impressive: capabilities claims `tools` alone because
+    initialize advertises `{"tools": {}}` and nothing else, and auth declares
+    itself open because it is. Advertising a resources or prompts interface
+    that does not exist would be the machine-readable version of lying.
+    """
+    return {
+        # §6.2 — required.
+        "mcp_version": PROTOCOL_VERSION,
+        "name": SERVER_INFO["name"],
+        "endpoint": f"{SITE_BASE_URL}/mcp",
+        "transport": "http",
+        # §6.3 — recommended. All four are answerable honestly, so all four
+        # are here; a SHOULD is only worth skipping when the truthful answer
+        # is unknown.
+        "description": (
+            "Compliance data for AI crawlers: which ones fetch robots.txt-forbidden "
+            "honeypot paths, and which discovery surfaces they read. Read-only."
+        ),
+        "auth": {"required": False, "methods": ["none"]},
+        "capabilities": ["tools"],
+        "trust_class": "public",
+        # §6.4 — optional.
+        "docs": f"{SITE_BASE_URL}/blog/mcp-endpoint",
+    }
+
+
 # `_meta` key carrying the protocol version in the request body. The
 # MCP-Protocol-Version header mirrors it and the two MUST agree.
 META_PROTOCOL_VERSION = "io.modelcontextprotocol/protocolVersion"

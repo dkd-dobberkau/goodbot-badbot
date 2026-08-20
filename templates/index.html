@@ -752,7 +752,7 @@
 </div>
 
 <section class="discovery-section">
-  <h2 class="panel-title" id="discovery-title">Discovery Reads — who fetches llms.txt, agents.md, grounding pages, the API/AI catalogs &amp; the MCP endpoint</h2>
+  <h2 class="panel-title" id="discovery-title">Discovery Reads — who fetches llms.txt, agents.md, grounding pages, the API/AI catalogs &amp; the MCP manifest and endpoint</h2>
   <p class="discovery-intro">
     These files are <strong>invitations</strong>, not traps:
     <code>/llms.txt</code> is the LLM-oriented site summary, and
@@ -767,9 +767,15 @@
     site so agents can find it in the first place. Finally
     <code>/mcp</code> is a stateless Model Context Protocol server: not a
     document to read but an interface to <em>call</em>, offering the same
-    compliance data as two read-only tools. MCP has no discovery standard, so
-    nothing tells an agent that path exists — how one finds it is itself the
-    measurement. Reading or calling any of them is
+    compliance data as two read-only tools. MCP has no <em>ratified</em>
+    discovery standard, and for most of this experiment nothing told an agent
+    that the path existed — how one found it was itself the measurement. Since
+    August 2026 the site also serves
+    <code>/.well-known/mcp-server</code>, the manifest proposed by
+    <a href="https://datatracker.ietf.org/doc/draft-serra-mcp-discovery-uri/" target="_blank" rel="noopener noreferrer">draft-serra-mcp-discovery-uri</a>
+    — an individual Internet-Draft with no IETF standing that expires in
+    September 2026. Whether anything ever reads it is the newest quiet column
+    here. Reading or calling any of them is
     <strong>not a violation</strong> — it is the opposite signal: an agent
     deliberately doing discovery. So far <strong id="discoveryTotal">—</strong>
     discovery reads have been logged, plus
@@ -812,6 +818,7 @@
         <th scope="col" style="text-align:right">grounding</th>
         <th scope="col" style="text-align:right">api catalog</th>
         <th scope="col" style="text-align:right">ai catalog</th>
+        <th scope="col" style="text-align:right">mcp manifest</th>
         <th scope="col" style="text-align:right">mcp calls</th>
         <th scope="col" style="text-align:right">head probes</th>
         <th scope="col" style="text-align:right">Total reads</th>
@@ -819,7 +826,7 @@
       </tr>
     </thead>
     <tbody id="discoveryTable">
-      <tr><td colspan="12" class="empty-state">Loading…</td></tr>
+      <tr><td colspan="13" class="empty-state">Loading…</td></tr>
     </tbody>
   </table>
 </section>
@@ -980,7 +987,7 @@ function renderStats(data) {
   const discTable = document.getElementById('discoveryTable');
   const discovery = data.discovery_reads || [];
   if (discovery.length === 0) {
-    discTable.innerHTML = `<tr><td colspan="12" class="empty-state">No discovery reads logged yet.</td></tr>`;
+    discTable.innerHTML = `<tr><td colspan="13" class="empty-state">No discovery reads logged yet.</td></tr>`;
   } else {
     discTable.innerHTML = discovery.map(row => {
       const llms = Number(row.llms_reads) || 0;
@@ -988,6 +995,7 @@ function renderStats(data) {
       const facts = Number(row.facts_reads) || 0;
       const catalog = Number(row.catalog_reads) || 0;
       const ard = Number(row.ard_reads) || 0;
+      const mcpManifest = Number(row.mcp_manifest_reads) || 0;
       const mcpCalls = Number(row.mcp_calls) || 0;
       const probes = Number(row.head_probes) || 0;
       const total = Number(row.total_reads) || 0;
@@ -1014,6 +1022,7 @@ function renderStats(data) {
         ${cell(facts)}
         ${cell(catalog)}
         ${cell(ard)}
+        ${cell(mcpManifest)}
         ${cell(mcpCalls)}
         ${cell(probes)}
         <td class="read-count nonzero">${total}</td>

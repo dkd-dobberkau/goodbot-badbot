@@ -22,8 +22,12 @@ Count what this site now offers a machine, and when each thing was invented:
   linkset format it is served in is older.
 - **`/.well-known/ai-catalog.json`** — Agentic Resource Discovery, and there is
   no registry indexing it yet.
-- **`/mcp`** — Model Context Protocol, 2024, and the one with no discovery
-  specification at all.
+- **`/mcp`** — Model Context Protocol, announced November 2024, and the one with
+  no ratified way to *find* it. There is a specification —
+  [draft-serra-mcp-discovery-uri](https://datatracker.ietf.org/doc/draft-serra-mcp-discovery-uri/),
+  which defines a `/.well-known/mcp-server` manifest — but it is an individual
+  Internet-Draft with, in the IETF's own words, "no formal standing", and it
+  expires in September 2026.
 - **`/feed.xml`** — [RFC 4287](https://www.rfc-editor.org/rfc/rfc4287.html),
   December 2005, IETF **Standards Track**.
 
