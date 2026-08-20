@@ -908,6 +908,22 @@ trips a honeypot, where its visit is recorded.
 - [MCP server manifest](https://goodbot-badbot.com/.well-known/mcp-server): discovery manifest for the endpoint above, per draft-serra-mcp-discovery-uri (an individual Internet-Draft, not a ratified standard)
 - [robots.txt](https://goodbot-badbot.com/robots.txt): the honeypot rules
 
+### Calling the MCP endpoint
+
+Revision 2026-07-28 is stateless: no `initialize` handshake, so the first POST
+must already carry every required header or it is rejected with `-32020
+HeaderMismatch`. `Mcp-Method` must equal the body's `method`; `tools/call` also
+needs `Mcp-Name` matching `params.name`. `GET` and `DELETE` return `405`.
+
+```
+curl -X POST https://goodbot-badbot.com/mcp \\
+  -H 'Content-Type: application/json' \\
+  -H 'Accept: application/json, text/event-stream' \\
+  -H 'MCP-Protocol-Version: 2026-07-28' \\
+  -H 'Mcp-Method: tools/list' \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
 ## Grounding pages
 
 Factual, machine-readable entity definitions for AI systems to cite:
@@ -994,15 +1010,35 @@ the `MCP-Protocol-Version` and `Mcp-Method` headers. Two read-only tools:
 - `get_compliance_stats` — the full crawler scoreboard
 - `check_bot` — one crawler, by display name or User-Agent string
 
+Because the revision is stateless there is no handshake to learn the rules
+from: the first request either carries every required header or is rejected
+with `-32020 HeaderMismatch`. A complete, working call:
+
+```
+curl -X POST https://goodbot-badbot.com/mcp \\
+  -H 'Content-Type: application/json' \\
+  -H 'Accept: application/json, text/event-stream' \\
+  -H 'MCP-Protocol-Version: 2026-07-28' \\
+  -H 'Mcp-Method: tools/list' \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+`Mcp-Method` must equal the body's `method`. For `tools/call` add
+`Mcp-Name: <tool name>`, matching `params.name`. `GET` and `DELETE` return
+`405` — this revision removed the GET stream and protocol-level sessions.
+
 There is no A2A endpoint and no write operation of any kind.
 
 ## Transparency
 
 Requests to this file and to /mcp are logged (user-agent plus a
 SHA-256-truncated IP hash, the same privacy model as the rest of the site) so
-we can measure which agents probe for them. MCP has no discovery
-specification, so how an agent finds /mcp — by reading this file, by reading
-the ARD manifest, or by guessing the path outright — is itself the measurement.
+we can measure which agents probe for them. MCP has no *ratified* discovery
+standard; since August 2026 the site also serves /.well-known/mcp-server per
+draft-serra-mcp-discovery-uri, an individual Internet-Draft with no IETF
+standing. So how an agent finds /mcp — by reading this file, by reading the ARD
+manifest or that draft manifest, or by guessing the path outright — is itself
+the measurement.
 """
 
 

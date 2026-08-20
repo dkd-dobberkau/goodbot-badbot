@@ -48,6 +48,24 @@ SERVER_INSTRUCTIONS = (
 
 SITE_BASE_URL = "https://goodbot-badbot.com"
 
+
+def _missing_header_message(header: str) -> str:
+    """Explain a missing required header instead of only naming it.
+
+    Revision 2026-07-28 has no handshake, so a caller never learns the rules
+    from an initialize round-trip — the first request either carries every
+    header or fails. A bare "Mcp-Method header is required" is technically a
+    complete answer and practically a riddle, so the error states the whole
+    requirement at the moment it bites. (Written after walking into it while
+    verifying a deploy of this very endpoint.)
+    """
+    return (
+        f"Header mismatch: {header} header is required. Protocol revision "
+        f"{PROTOCOL_VERSION} is stateless — there is no initialize handshake, so "
+        "every POST must carry MCP-Protocol-Version and Mcp-Method, plus Mcp-Name "
+        f"for tools/call. Worked example: {SITE_BASE_URL}/llms.txt"
+    )
+
 # Discovery manifest for /.well-known/mcp-server, per
 # draft-serra-mcp-discovery-uri-04 §6.
 #
@@ -496,13 +514,15 @@ def handle_rpc(
     header_version = headers.get("mcp-protocol-version")
     if not header_version:
         return 400, _error(
-            req_id, HEADER_MISMATCH, "Header mismatch: MCP-Protocol-Version header is required"
+            req_id, HEADER_MISMATCH,
+            _missing_header_message("MCP-Protocol-Version"),
         )
 
     header_method = headers.get("mcp-method")
     if header_method is None:
         return 400, _error(
-            req_id, HEADER_MISMATCH, "Header mismatch: Mcp-Method header is required"
+            req_id, HEADER_MISMATCH,
+            _missing_header_message("Mcp-Method"),
         )
     if header_method != method:
         return 400, _error(

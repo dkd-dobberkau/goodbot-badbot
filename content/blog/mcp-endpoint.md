@@ -49,6 +49,7 @@ tools are:
 ```bash
 curl -sX POST https://goodbot-badbot.com/mcp \
   -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
   -H 'MCP-Protocol-Version: 2026-07-28' \
   -H 'Mcp-Method: tools/list' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
@@ -56,6 +57,42 @@ curl -sX POST https://goodbot-badbot.com/mcp \
 
 There are no write operations, and there will not be. `GET` and `DELETE` return
 `405` — this revision has no GET stream and no session teardown to tear down.
+
+### Stateless has a sharp edge
+
+Worth dwelling on the headers, because "stateless" sounds like a simplification
+and in practice it moves work onto the caller.
+
+Older revisions began with an `initialize` handshake. A client could open a
+session, be told the protocol version and the server's capabilities, and only
+then start making real calls — the handshake was where you found out the rules.
+Revision `2026-07-28` removed both the handshake and protocol-level sessions, so
+every POST has to stand alone. Which means **the first request either carries
+every required header or it fails.** There is no round trip in which to learn
+what was missing.
+
+Required on every call: `MCP-Protocol-Version`, and `Mcp-Method` matching the
+body's `method`. `tools/call` additionally needs `Mcp-Name` matching
+`params.name`. Get any of it wrong and the answer is `400` with JSON-RPC error
+`-32020 HeaderMismatch`.
+
+The author of this endpoint walked straight into it while verifying a deploy —
+sent `tools/list` without `Mcp-Method`, got an empty-looking result back, and
+briefly believed the server had no tools. The error message was correct and
+useless: it named the one header that was missing and nothing else. It now
+states the whole requirement and links a worked example, and both
+[`llms.txt`](/llms.txt) and [`agents.md`](/AGENTS.md) carry a complete
+copy-pasteable call. A test parses that published example and runs it through
+the real dispatcher, so the documentation cannot quietly drift away from the
+server.
+
+One conformance note in the other direction: the `Accept` header above is
+required *of clients* by the transport spec, listing both `application/json`
+and `text/event-stream`. This server does not enforce it — being lenient is
+deliberate, since a sloppy real-world agent is exactly the kind of data this
+site exists to collect. The example includes it anyway, because publishing a
+snippet that omits a MUST-level header teaches people to write clients that
+break against stricter servers.
 
 ## The fifth signal, and the first that isn't a document
 
