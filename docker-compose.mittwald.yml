@@ -10,3 +10,7 @@ services:
       MYSQL_DB: ${MYSQL_DB}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      # Salt for the visitor-IP digest. Must stay stable across deploys:
+      # changing it starts a new pseudonym space and breaks distinct-IP counts.
+      IP_HASH_SALT: ${IP_HASH_SALT}
+      VISIT_RETENTION_DAYS: "${VISIT_RETENTION_DAYS:-180}"

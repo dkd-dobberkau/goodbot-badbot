@@ -6,7 +6,9 @@ import asyncio
 import base64
 import hashlib
 import json
+import logging
 import os
+import secrets
 import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
@@ -25,7 +27,7 @@ from http_message_signatures import (
     algorithms,
 )
 
-from app import blog, facts, mcp
+from app import blog, facts, legal, mcp
 
 # The UA taxonomy lives in app.bots. identify_bot and KNOWN_BOTS are re-exported
 # here because both are part of this module's established import surface.
@@ -145,6 +147,37 @@ DB_CONFIG = {
     "autocommit": True,
 }
 
+
+# Uvicorn configures the root logger; this module just borrows it so startup
+# warnings land in the same container log as everything else.
+log = logging.getLogger("goodbot")
+
+
+# Salt for the visitor-IP hash. An unsalted SHA-256 of an IPv4 address is not
+# anonymisation: the whole address space is 2^32, so a rainbow table over it is
+# minutes of work and the digest maps straight back to the address. With a salt
+# the stored value is a pseudonym instead — still personal data under the GDPR,
+# but not trivially reversible by anyone who obtains the table.
+#
+# Set IP_HASH_SALT in the environment and keep it stable: changing it makes old
+# and new rows incomparable, so COUNT(DISTINCT ip_hash) will double-count any
+# caller seen on both sides of the change.
+IP_HASH_SALT = os.getenv("IP_HASH_SALT", "")
+if not IP_HASH_SALT:
+    # Random per-process rather than empty: an accidental deploy without the
+    # variable degrades distinct-IP counts (each restart starts a new pseudonym
+    # space) instead of silently reverting to reversible digests.
+    IP_HASH_SALT = secrets.token_hex(16)
+    log.warning(
+        "IP_HASH_SALT is not set; generated an ephemeral salt. "
+        "Distinct-IP counts will not be comparable across restarts."
+    )
+
+# How long a visit row is kept. Art. 5(1)(e) GDPR requires a limit, and the
+# question this site asks — how do automated callers behave over time — is
+# answerable within half a year.
+VISIT_RETENTION_DAYS = int(os.getenv("VISIT_RETENTION_DAYS", "180"))
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS visits (
     id               BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
@@ -206,7 +239,7 @@ async def log_visit(
         return
     method = (method or "")[:8].upper() or None
     bot_key, bot_name, operator = identify_bot(user_agent)
-    ip_hash = hashlib.sha256(ip.encode()).hexdigest()[:16]
+    ip_hash = hashlib.sha256((IP_HASH_SALT + ip).encode()).hexdigest()[:16]
     ts = datetime.now(timezone.utc).replace(tzinfo=None)
     async with pool.acquire() as conn:
         async with conn.cursor() as cur:
@@ -249,6 +282,41 @@ def _should_log_meta_visit(path: str, user_agent: str, method: str = "GET") -> b
     return True
 
 
+async def purge_expired_visits(pool) -> int:
+    """Delete visit rows past the retention window. Returns rows removed.
+
+    Deleting in one statement is fine at this table's size; if it ever grows
+    enough that the lock is felt, this becomes a chunked loop.
+    """
+    async with pool.acquire() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(
+                "DELETE FROM visits WHERE ts < UTC_TIMESTAMP() - INTERVAL %s DAY",
+                (VISIT_RETENTION_DAYS,),
+            )
+            return cur.rowcount
+
+
+async def _retention_loop(pool) -> None:
+    """Run the purge at startup and once a day after that.
+
+    A background task rather than a cron entry: the container is the whole
+    deployment unit, so the retention promise in the privacy notice should not
+    depend on separate scheduling that could be forgotten on a redeploy.
+    """
+    while True:
+        try:
+            removed = await purge_expired_visits(pool)
+            if removed:
+                log.info("retention: purged %d visit rows older than %d days",
+                         removed, VISIT_RETENTION_DAYS)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:  # keep the loop alive across transient DB errors
+            log.warning("retention sweep failed: %s", exc)
+        await asyncio.sleep(24 * 60 * 60)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     pool = await aiomysql.create_pool(minsize=2, maxsize=20, **DB_CONFIG)
@@ -257,7 +325,13 @@ async def lifespan(app: FastAPI):
             await cur.execute(SCHEMA)
             await _ensure_added_columns(cur)
     app.state.db_pool = pool
+    retention = asyncio.create_task(_retention_loop(pool))
     yield
+    retention.cancel()
+    try:
+        await retention
+    except asyncio.CancelledError:
+        pass
     pool.close()
     await pool.wait_closed()
 
@@ -1080,6 +1154,28 @@ async def blog_post(request: Request, slug: str):
     if _wants_markdown(request.headers.get("accept", "")):
         return Response(content=post.md, media_type="text/markdown; charset=utf-8")
     return HTMLResponse(content=blog.render_post_html(post))
+
+
+# ── Legal pages ────────────────────────────────────────────────────────────────
+
+# Provider identification (§ 5 DDG) and the privacy notice (Art. 13 GDPR).
+# Reads are deliberately NOT recorded: these pages exist so a person can find a
+# postal address, and logging that visit would be measuring the wrong thing.
+
+@app.get("/impressum", include_in_schema=False)
+async def impressum():
+    page = legal.get_page("impressum")
+    if page is None:
+        return PlainTextResponse("Not Found", status_code=404)
+    return HTMLResponse(content=legal.render_page_html(page))
+
+
+@app.get("/datenschutz", include_in_schema=False)
+async def datenschutz():
+    page = legal.get_page("datenschutz")
+    if page is None:
+        return PlainTextResponse("Not Found", status_code=404)
+    return HTMLResponse(content=legal.render_page_html(page))
 
 
 # ── Grounding pages ────────────────────────────────────────────────────────────
