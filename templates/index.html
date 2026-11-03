@@ -290,6 +290,11 @@
     font-size: 0.88rem;
   }
 
+  /* Wide tables scroll inside their own box instead of widening the page.
+     Focusable so keyboard users can scroll it with the arrow keys. */
+  .table-scroll { overflow-x: auto; }
+  .table-scroll:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+
   th {
     font-family: var(--mono);
     font-size: 0.68rem;
@@ -628,10 +633,19 @@
   .signed-cell.has-verified { color: var(--green); }
 
   @media (max-width: 900px) {
-    .main-grid { grid-template-columns: 1fr; }
+    /* minmax(0, …): a bare 1fr never shrinks below its content's min width. */
+    .main-grid { grid-template-columns: minmax(0, 1fr); }
     .stats-row { grid-template-columns: 1fr; }
     .stat-box  { border-right: none; border-bottom: 1px solid var(--border); }
     header, .hero, .panel, .feed-panel, .discovery-section, footer { padding-left: 1.5rem; padding-right: 1.5rem; }
+    /* Logo, theme toggle and status need ~300px; below that, wrap instead of overflow. */
+    header { flex-wrap: wrap; gap: 0.75rem 1rem; }
+    .header-right { gap: 1rem; }
+    /* Cells have no side padding; on desktop width:100% spreads the columns,
+       but a table squeezed to its min width here would run them together. */
+    th + th, td + td { padding-left: 1rem; }
+    /* Keep names and verdict badges on one line; the table scrolls instead. */
+    .bot-name, .verdict { white-space: nowrap; }
   }
 </style>
 </head>
@@ -690,22 +704,24 @@
 <div class="main-grid">
   <div class="panel">
     <h2 class="panel-title" id="scoreboard-title">Bot Compliance Scoreboard</h2>
-    <table aria-labelledby="scoreboard-title">
-      <thead>
-        <tr>
-          <th scope="col">Bot</th>
-          <th scope="col">Operator</th>
-          <th scope="col">Verdict</th>
-          <th scope="col" style="text-align:right">Signed</th>
-          <th scope="col" style="text-align:right">Violations</th>
-          <th scope="col" style="text-align:right">Spoofed</th>
-          <th scope="col" style="text-align:right">Visits</th>
-        </tr>
-      </thead>
-      <tbody id="botTable">
-        <tr><td colspan="7" class="empty-state">Loading…</td></tr>
-      </tbody>
-    </table>
+    <div class="table-scroll" tabindex="0" role="region" aria-labelledby="scoreboard-title">
+      <table aria-labelledby="scoreboard-title">
+        <thead>
+          <tr>
+            <th scope="col">Bot</th>
+            <th scope="col">Operator</th>
+            <th scope="col">Verdict</th>
+            <th scope="col" style="text-align:right">Signed</th>
+            <th scope="col" style="text-align:right">Violations</th>
+            <th scope="col" style="text-align:right">Spoofed</th>
+            <th scope="col" style="text-align:right">Visits</th>
+          </tr>
+        </thead>
+        <tbody id="botTable">
+          <tr><td colspan="7" class="empty-state">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
 
     <div class="robots-box">
       <div class="robots-header">robots.txt — honeypot config</div>
@@ -770,19 +786,21 @@
     name looks exactly like the real crawler and stays on the scoreboard; only
     a verified Web Bot Auth signature can tell the two apart.
   </p>
-  <table aria-labelledby="spoof-title">
-    <thead>
-      <tr>
-        <th scope="col">Burst started</th>
-        <th scope="col">Names claimed</th>
-        <th scope="col">Trap paths</th>
-        <th scope="col" style="text-align:right">Honeypot hits</th>
-      </tr>
-    </thead>
-    <tbody id="spoofTable">
-      <tr><td colspan="4" class="empty-state">Loading…</td></tr>
-    </tbody>
-  </table>
+  <div class="table-scroll" tabindex="0" role="region" aria-labelledby="spoof-title">
+    <table aria-labelledby="spoof-title">
+      <thead>
+        <tr>
+          <th scope="col">Burst started</th>
+          <th scope="col">Names claimed</th>
+          <th scope="col">Trap paths</th>
+          <th scope="col" style="text-align:right">Honeypot hits</th>
+        </tr>
+      </thead>
+      <tbody id="spoofTable">
+        <tr><td colspan="4" class="empty-state">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
 </section>
 
 <section class="discovery-section">
@@ -841,28 +859,30 @@
     this site answered <code>HEAD</code> with <code>405</code> everywhere, so
     the probe column necessarily starts empty.
   </p>
-  <table aria-labelledby="discovery-title">
-    <thead>
-      <tr>
-        <th scope="col">Class</th>
-        <th scope="col">Bot</th>
-        <th scope="col">Operator</th>
-        <th scope="col" style="text-align:right">llms.txt</th>
-        <th scope="col" style="text-align:right">agents.md</th>
-        <th scope="col" style="text-align:right">grounding</th>
-        <th scope="col" style="text-align:right">api catalog</th>
-        <th scope="col" style="text-align:right">ai catalog</th>
-        <th scope="col" style="text-align:right">mcp manifest</th>
-        <th scope="col" style="text-align:right">mcp calls</th>
-        <th scope="col" style="text-align:right">head probes</th>
-        <th scope="col" style="text-align:right">Total reads</th>
-        <th scope="col" style="text-align:right">Last read</th>
-      </tr>
-    </thead>
-    <tbody id="discoveryTable">
-      <tr><td colspan="13" class="empty-state">Loading…</td></tr>
-    </tbody>
-  </table>
+  <div class="table-scroll" tabindex="0" role="region" aria-labelledby="discovery-title">
+    <table aria-labelledby="discovery-title">
+      <thead>
+        <tr>
+          <th scope="col">Class</th>
+          <th scope="col">Bot</th>
+          <th scope="col">Operator</th>
+          <th scope="col" style="text-align:right">llms.txt</th>
+          <th scope="col" style="text-align:right">agents.md</th>
+          <th scope="col" style="text-align:right">grounding</th>
+          <th scope="col" style="text-align:right">api catalog</th>
+          <th scope="col" style="text-align:right">ai catalog</th>
+          <th scope="col" style="text-align:right">mcp manifest</th>
+          <th scope="col" style="text-align:right">mcp calls</th>
+          <th scope="col" style="text-align:right">head probes</th>
+          <th scope="col" style="text-align:right">Total reads</th>
+          <th scope="col" style="text-align:right">Last read</th>
+        </tr>
+      </thead>
+      <tbody id="discoveryTable">
+        <tr><td colspan="13" class="empty-state">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
 </section>
 
 <section class="discovery-section">
@@ -888,20 +908,22 @@
     the heaviest readers here are in that group. Anonymous callers have no name
     to print, so they are listed by user-agent; hover for the full string.
   </p>
-  <table aria-labelledby="trap-title">
-    <thead>
-      <tr>
-        <th scope="col">Class</th>
-        <th scope="col">Caller</th>
-        <th scope="col" style="text-align:right">Grounding reads</th>
-        <th scope="col" style="text-align:right">Honeypot hits</th>
-        <th scope="col" style="text-align:right">IPs</th>
-      </tr>
-    </thead>
-    <tbody id="trapTable">
-      <tr><td colspan="5" class="empty-state">Loading…</td></tr>
-    </tbody>
-  </table>
+  <div class="table-scroll" tabindex="0" role="region" aria-labelledby="trap-title">
+    <table aria-labelledby="trap-title">
+      <thead>
+        <tr>
+          <th scope="col">Class</th>
+          <th scope="col">Caller</th>
+          <th scope="col" style="text-align:right">Grounding reads</th>
+          <th scope="col" style="text-align:right">Honeypot hits</th>
+          <th scope="col" style="text-align:right">IPs</th>
+        </tr>
+      </thead>
+      <tbody id="trapTable">
+        <tr><td colspan="5" class="empty-state">Loading…</td></tr>
+      </tbody>
+    </table>
+  </div>
 </section>
 
 </main>
