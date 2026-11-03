@@ -26,7 +26,6 @@ from http_message_signatures import (
     HTTPSignatureKeyResolver,
     algorithms,
 )
-from http_message_signatures.resolvers import HTTPSignatureComponentResolver
 
 from app import blog, facts, legal, mcp
 
@@ -431,21 +430,6 @@ class _JWKSKeyResolver(HTTPSignatureKeyResolver):
         return self.keys[key_id]
 
 
-class _KeyedMemberComponentResolver(HTTPSignatureComponentResolver):
-    """Resolves `"field";key="member"` to that dictionary member's value
-    (RFC 9421 §2.1.2). http-message-signatures 2.0.1 ignores the key
-    parameter and returns the whole field, so every signature over a
-    dictionary-form Signature-Agent failed against the wrong base."""
-
-    def resolve(self, component_node: http_sfv.Item):
-        member_key = component_node.params.get("key")
-        if member_key is None or str(component_node.value).startswith("@"):
-            return super().resolve(component_node)
-        dictionary = http_sfv.Dictionary()
-        dictionary.parse(super().resolve(component_node).encode())
-        return str(dictionary[member_key])
-
-
 # Bounds the JWKS fetches one request can trigger.
 MAX_SIGNATURE_AGENTS = 3
 
@@ -504,7 +488,6 @@ async def _verify_request_signature(request: Request) -> str | None:
     verifier = HTTPMessageVerifier(
         signature_algorithm=algorithms.ED25519,
         key_resolver=resolver,
-        component_resolver_class=_KeyedMemberComponentResolver,
     )
     httpx_req = httpx.Request(
         method=request.method,

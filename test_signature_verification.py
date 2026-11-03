@@ -80,8 +80,8 @@ def _signed_request_dictionary_form(
     "signature-agent";key="agent1".
 
     The signature base is assembled by hand per RFC 9421 §2.5 rather than via
-    HTTPMessageSigner, because that library ignores the `key` parameter and
-    would sign the whole header value — the very bug under test."""
+    HTTPMessageSigner, so the test does not share the library's view of
+    `;key=` resolution (2.x signed the whole field value)."""
     agent_header = f'agent1="{AGENT_URL}"'
     components = ['"@authority"']
     base_lines = ['"@authority": goodbot-badbot.com']
