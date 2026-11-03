@@ -147,7 +147,10 @@ TOOLS: list[dict[str, Any]] = [
             "observed on goodbot-badbot.com, how many times it was seen, how "
             "many honeypot violations it committed, and the resulting verdict "
             "(good_bot = zero violations, bad_bot = one or more). Sorted by "
-            "violations descending."
+            "violations descending. Violations exclude spoofed_hits: honeypot "
+            "hits made under the bot's name by a client that claimed bots of "
+            "another operator from the same address within 60 seconds. A client "
+            "that only ever borrows one name is not detected."
         ),
         "inputSchema": {
             "type": "object",
@@ -171,6 +174,7 @@ TOOLS: list[dict[str, Any]] = [
                     "type": "object",
                     "properties": {
                         "violations": {"type": "integer"},
+                        "spoofed_hits": {"type": "integer"},
                         "bots_seen": {"type": "integer"},
                         "verified_signatures": {"type": "integer"},
                         "discovery_reads": {"type": "integer"},
@@ -187,6 +191,7 @@ TOOLS: list[dict[str, Any]] = [
                             "verdict": {"type": "string", "enum": ["good_bot", "bad_bot"]},
                             "total_visits": {"type": "integer"},
                             "violations": {"type": "integer"},
+                            "spoofed_hits": {"type": "integer"},
                             "verified_visits": {"type": "integer"},
                             "last_seen": {"type": ["string", "null"]},
                         },
@@ -204,7 +209,8 @@ TOOLS: list[dict[str, Any]] = [
             "Look up a single crawler by display name (e.g. 'GPTBot') or by raw "
             "User-Agent string. Reports whether it is a recognised AI crawler, "
             "and — if it has been observed here — its visit count, honeypot "
-            "violations and verdict."
+            "violations (excluding spoofed_hits, see get_compliance_stats) and "
+            "verdict."
         ),
         "inputSchema": {
             "type": "object",
@@ -236,6 +242,7 @@ TOOLS: list[dict[str, Any]] = [
                 "verdict": {"type": ["string", "null"], "enum": ["good_bot", "bad_bot", None]},
                 "total_visits": {"type": "integer"},
                 "violations": {"type": "integer"},
+                "spoofed_hits": {"type": "integer"},
                 "last_seen": {"type": ["string", "null"]},
             },
             "required": ["query", "recognised", "observed"],
@@ -339,6 +346,7 @@ def _row_to_bot(row: dict[str, Any]) -> dict[str, Any]:
         "verdict": _verdict(violations),
         "total_visits": int(row.get("total_visits") or 0),
         "violations": violations,
+        "spoofed_hits": int(row.get("spoofed_hits") or 0),
         "verified_visits": int(row.get("verified_visits") or 0),
         "last_seen": _iso(row.get("last_seen")),
     }
@@ -354,6 +362,7 @@ def _tool_get_compliance_stats(arguments: dict[str, Any], stats: dict[str, Any])
         "source": "https://goodbot-badbot.com/api/stats",
         "totals": {
             "violations": int(stats.get("total_violations") or 0),
+            "spoofed_hits": int(stats.get("total_spoofed_hits") or 0),
             "bots_seen": int(stats.get("total_bots_seen") or 0),
             "verified_signatures": int(stats.get("total_verified") or 0),
             "discovery_reads": int(stats.get("total_discovery_reads") or 0),
@@ -400,6 +409,7 @@ def _tool_check_bot(
             "verdict": None,
             "total_visits": 0,
             "violations": 0,
+            "spoofed_hits": 0,
             "last_seen": None,
             "note": (
                 "Recognised AI crawler, but it has not visited this site yet."

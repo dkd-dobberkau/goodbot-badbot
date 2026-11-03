@@ -27,7 +27,7 @@ from http_message_signatures import (
     algorithms,
 )
 
-from app import blog, facts, legal, mcp
+from app import blog, facts, legal, mcp, spoofing
 
 # The UA taxonomy lives in app.bots. identify_bot and KNOWN_BOTS are re-exported
 # here because both are part of this module's established import surface.
@@ -1456,17 +1456,40 @@ async def _compute_stats() -> dict:
             """)
             summary = await cur.fetchall()
 
+            # Named visits are few (a couple of thousand over the retention
+            # window), so User-Agent rotation is detected in Python rather
+            # than with a self-join: see app/spoofing.py for the rule.
             await cur.execute("""
+                SELECT id, ts, ip_hash, bot_name, operator, path, is_honeypot
+                FROM visits
+                WHERE bot_name IS NOT NULL AND ip_hash IS NOT NULL
+            """)
+            named_visits = await cur.fetchall()
+            spoofed_ids = spoofing.find_spoofed_visit_ids(named_visits)
+            summary = spoofing.attributed_summary(summary, named_visits, spoofed_ids)
+            spoof_bursts = spoofing.group_spoof_bursts(named_visits, spoofed_ids)
+            spoofed_hit_ids = sorted(
+                visit["id"] for visit in named_visits
+                if visit["id"] in spoofed_ids and visit["is_honeypot"]
+            )
+            not_spoofed = ""
+            if spoofed_hit_ids:
+                not_spoofed = f"AND id NOT IN ({','.join(['%s'] * len(spoofed_hit_ids))})"
+
+            await cur.execute(
+                f"""
                 SELECT ts, path, bot_name, operator, user_agent, signature_status, method
                 FROM visits
-                WHERE is_honeypot = 1
+                WHERE is_honeypot = 1 {not_spoofed}
                 ORDER BY ts DESC
                 LIMIT 20
-            """)
+                """,
+                tuple(spoofed_hit_ids),
+            )
             recent = await cur.fetchall()
 
             await cur.execute("SELECT COUNT(*) AS c FROM visits WHERE is_honeypot = 1")
-            total_violations = (await cur.fetchone())["c"]
+            total_violations = (await cur.fetchone())["c"] - len(spoofed_hit_ids)
 
             await cur.execute("SELECT COUNT(DISTINCT bot_name) AS c FROM visits WHERE bot_name IS NOT NULL")
             total_bots = (await cur.fetchone())["c"]
@@ -1584,6 +1607,9 @@ async def _compute_stats() -> dict:
         "summary": summary,
         "recent_violations": recent,
         "total_violations": total_violations,
+        "total_spoofed_hits": len(spoofed_hit_ids),
+        "spoof_bursts": spoof_bursts,
+        "spoof_window_s": spoofing.SPOOF_WINDOW_S,
         "total_bots_seen": total_bots,
         "total_verified": total_verified,
         "discovery_reads": discovery,

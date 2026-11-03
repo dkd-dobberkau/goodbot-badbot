@@ -698,11 +698,12 @@
           <th scope="col">Verdict</th>
           <th scope="col" style="text-align:right">Signed</th>
           <th scope="col" style="text-align:right">Violations</th>
+          <th scope="col" style="text-align:right">Spoofed</th>
           <th scope="col" style="text-align:right">Visits</th>
         </tr>
       </thead>
       <tbody id="botTable">
-        <tr><td colspan="6" class="empty-state">Loading…</td></tr>
+        <tr><td colspan="7" class="empty-state">Loading…</td></tr>
       </tbody>
     </table>
 
@@ -750,6 +751,39 @@
     </div>
   </div>
 </div>
+
+<section class="discovery-section">
+  <h2 class="panel-title" id="spoof-title">Spoofed hits — names borrowed, not charged</h2>
+  <p class="discovery-intro">
+    A User-Agent is a string the client picks, and some clients cycle through
+    several crawlers' names from one address within seconds. When one address
+    claims bots of <em>different operators</em> within
+    <span id="spoofWindow">60</span> seconds, every named visit in that burst
+    is treated as spoofed. Its honeypot hits are listed here and are
+    <strong>not</strong> charged to the bots it impersonated:
+    <strong id="spoofTotal">—</strong> hits set aside so far. Bots of one
+    operator sharing an address (GPTBot and OAI-SearchBot, say) do not count
+    as spoofing.
+  </p>
+  <p class="discovery-intro">
+    The filter only catches rotation. A client that sticks to one borrowed
+    name looks exactly like the real crawler and stays on the scoreboard; only
+    a verified Web Bot Auth signature can tell the two apart.
+  </p>
+  <table aria-labelledby="spoof-title">
+    <thead>
+      <tr>
+        <th scope="col">Burst started</th>
+        <th scope="col">Names claimed</th>
+        <th scope="col">Trap paths</th>
+        <th scope="col" style="text-align:right">Honeypot hits</th>
+      </tr>
+    </thead>
+    <tbody id="spoofTable">
+      <tr><td colspan="4" class="empty-state">Loading…</td></tr>
+    </tbody>
+  </table>
+</section>
 
 <section class="discovery-section">
   <h2 class="panel-title" id="discovery-title">Discovery Reads — who fetches llms.txt, agents.md, grounding pages, the API/AI catalogs &amp; the MCP manifest and endpoint</h2>
@@ -900,6 +934,8 @@ async function loadStats() {
 function getDemoData() {
   return {
     total_violations: 0,
+    total_spoofed_hits: 0,
+    spoof_bursts: [],
     total_bots_seen: 0,
     total_verified: 0,
     total_discovery_reads: 0,
@@ -929,7 +965,7 @@ function renderStats(data) {
 
   const tbody = document.getElementById('botTable');
   if (data.summary.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No bots observed yet — waiting for crawlers.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No bots observed yet — waiting for crawlers.</td></tr>`;
   } else {
     tbody.innerHTML = data.summary.map(row => {
       const isBad = row.violations > 0;
@@ -947,7 +983,29 @@ function renderStats(data) {
         <td>${verdict}</td>
         ${signedCell}
         <td class="count ${isBad ? 'nonzero' : ''}">${row.violations}</td>
+        <td class="count">${Number(row.spoofed_hits) || '—'}</td>
         <td class="count">${total}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('spoofTotal').textContent =
+    (data.total_spoofed_hits || 0).toLocaleString();
+  document.getElementById('spoofWindow').textContent = data.spoof_window_s || 60;
+  const spoofTable = document.getElementById('spoofTable');
+  const bursts = data.spoof_bursts || [];
+  if (bursts.length === 0) {
+    spoofTable.innerHTML = `<tr><td colspan="4" class="empty-state">No spoofing bursts detected.</td></tr>`;
+  } else {
+    spoofTable.innerHTML = bursts.map(burst => {
+      const started = new Date(burst.started + 'Z').toLocaleString('en-GB');
+      const trapPaths = [...new Set((burst.visits || [])
+        .filter(v => v.is_honeypot).map(v => v.path))];
+      return `<tr>
+        <td>${esc(started)}</td>
+        <td>${(burst.claimed_bots || []).map(name => `<span class="bot-name">${esc(name)}</span>`).join(', ')}</td>
+        <td>${trapPaths.map(path => `<span class="feed-path">${esc(path)}</span>`).join('<br>') || '—'}</td>
+        <td class="count">${Number(burst.honeypot_hits) || 0}</td>
       </tr>`;
     }).join('');
   }
