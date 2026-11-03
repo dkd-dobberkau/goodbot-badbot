@@ -75,6 +75,12 @@ six named operators, OpenAI's crawlers accounting for the most, and roughly
 half the named bots (Apple, Amazon, Brave, Common Crawl, You.com) tripping
 nothing at all. Thirteen data points is not a league table. It is a hint.
 
+> **Correction, 3 November 2026:** the signal was not clean. Six of those
+> named violations came from two clients that rotated through several
+> crawlers' names from one address within a second, and every Anthropic and
+> Perplexity hit among them was one of those six. See [The bots in the trap
+> weren't the bots](/blog/the-bots-in-the-trap).
+
 ## The caveats, stated plainly
 
 - **It is a snapshot.** 51 days, 1,258 requests. Trends need months.
