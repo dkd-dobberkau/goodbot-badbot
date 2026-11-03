@@ -26,6 +26,7 @@ from http_message_signatures import (
     HTTPSignatureKeyResolver,
     algorithms,
 )
+from http_message_signatures.resolvers import HTTPSignatureComponentResolver
 
 from app import blog, facts, legal, mcp
 
@@ -430,15 +431,58 @@ class _JWKSKeyResolver(HTTPSignatureKeyResolver):
         return self.keys[key_id]
 
 
-def _parse_signature_agent(raw: str) -> str | None:
-    # Signature-Agent is an sf-string per the Web Bot Auth draft.
+class _KeyedMemberComponentResolver(HTTPSignatureComponentResolver):
+    """Resolves `"field";key="member"` to that dictionary member's value
+    (RFC 9421 §2.1.2). http-message-signatures 2.0.1 ignores the key
+    parameter and returns the whole field, so every signature over a
+    dictionary-form Signature-Agent failed against the wrong base."""
+
+    def resolve(self, component_node: http_sfv.Item):
+        member_key = component_node.params.get("key")
+        if member_key is None or str(component_node.value).startswith("@"):
+            return super().resolve(component_node)
+        dictionary = http_sfv.Dictionary()
+        dictionary.parse(super().resolve(component_node).encode())
+        return str(dictionary[member_key])
+
+
+# Bounds the JWKS fetches one request can trigger.
+MAX_SIGNATURE_AGENTS = 3
+
+
+def _parse_signature_agent(raw: str) -> list[str]:
+    # Current drafts make Signature-Agent an sf-dictionary
+    # (agent1="https://..."); earlier ones used a bare sf-string, which some
+    # agents still send. Accept both.
+    try:
+        dictionary = http_sfv.Dictionary()
+        dictionary.parse(raw.encode())
+        urls = [member.value for member in dictionary.values()
+                if isinstance(getattr(member, "value", None), str)]
+        return urls[:MAX_SIGNATURE_AGENTS]
+    except Exception:
+        pass
     try:
         item = http_sfv.Item()
         item.parse(raw.encode())
-        value = item.value
-        return value if isinstance(value, str) else None
+        return [item.value] if isinstance(item.value, str) else []
     except Exception:
-        return None
+        return []
+
+
+def _covers_required_components(covered_component_keys) -> bool:
+    # Web Bot Auth draft §4: @authority and Signature-Agent MUST be covered.
+    # The agent component may carry ;key="member" in the dictionary form, so
+    # compare component names, not serialised keys.
+    names = set()
+    for component_key in covered_component_keys:
+        item = http_sfv.Item()
+        try:
+            item.parse(component_key.encode())
+        except Exception:
+            continue
+        names.add(item.value)
+    return {"@authority", "signature-agent"}.issubset(names)
 
 
 async def _verify_request_signature(request: Request) -> str | None:
@@ -449,18 +493,18 @@ async def _verify_request_signature(request: Request) -> str | None:
     agent_raw = headers.get("signature-agent")
     if not agent_raw:
         return "failed"
-    agent_url = _parse_signature_agent(agent_raw)
-    if not agent_url:
+    agent_urls = _parse_signature_agent(agent_raw)
+    if not agent_urls:
         return "failed"
-    jwks = await _get_jwks(agent_url)
-    if not jwks:
-        return "failed"
-    resolver = _JWKSKeyResolver(jwks)
+    directories = await asyncio.gather(*(_get_jwks(url) for url in agent_urls))
+    merged_keys = [key for jwks in directories if jwks for key in jwks.get("keys", [])]
+    resolver = _JWKSKeyResolver({"keys": merged_keys})
     if not resolver.keys:
         return "failed"
     verifier = HTTPMessageVerifier(
         signature_algorithm=algorithms.ED25519,
         key_resolver=resolver,
+        component_resolver_class=_KeyedMemberComponentResolver,
     )
     httpx_req = httpx.Request(
         method=request.method,
@@ -472,17 +516,8 @@ async def _verify_request_signature(request: Request) -> str | None:
     except Exception:
         return "failed"
 
-    # Web Bot Auth draft §4: at minimum @authority and signature-agent MUST
-    # be covered.  covered_components keys use the sf-string serialisation
-    # produced by http_sfv.List, so the required keys are the literals
-    # '"@authority"' and '"signature-agent"' (with embedded quotes).
-    # We accept the signature as verified only when at least one label
-    # satisfies both constraints.
-    _REQUIRED_COMPONENTS = {'"@authority"', '"signature-agent"'}
-    if not any(
-        _REQUIRED_COMPONENTS.issubset(result.covered_components)
-        for result in results
-    ):
+    # Verified only when at least one label covers both required components.
+    if not any(_covers_required_components(result.covered_components) for result in results):
         return "failed"
 
     return "verified"

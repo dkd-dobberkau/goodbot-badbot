@@ -12,6 +12,7 @@ Exit 0 if all assertions pass, 1 otherwise.
 import asyncio
 import base64
 import sys
+import time
 
 import http_sfv
 import httpx
@@ -68,6 +69,39 @@ def _signed_request(private_key: Ed25519PrivateKey, covered: tuple[str, ...]) ->
     return _FakeRequest("GET", REQUEST_URL, dict(req.headers))
 
 
+def _signed_request_dictionary_form(
+    private_key: Ed25519PrivateKey,
+    *,
+    sign_agent_member: bool = True,
+    agent_header_override: str | None = None,
+) -> _FakeRequest:
+    """Build a request using the current draft's Signature-Agent format: an
+    sf-dictionary (agent1="https://...") whose member is covered as
+    "signature-agent";key="agent1".
+
+    The signature base is assembled by hand per RFC 9421 §2.5 rather than via
+    HTTPMessageSigner, because that library ignores the `key` parameter and
+    would sign the whole header value — the very bug under test."""
+    agent_header = f'agent1="{AGENT_URL}"'
+    components = ['"@authority"']
+    base_lines = ['"@authority": goodbot-badbot.com']
+    if sign_agent_member:
+        components.append('"signature-agent";key="agent1"')
+        base_lines.append(f'"signature-agent";key="agent1": "{AGENT_URL}"')
+    created = int(time.time())
+    params = (
+        f'({" ".join(components)});created={created};keyid="{KID}"'
+        f';alg="ed25519";expires={created + 300};tag="web-bot-auth"'
+    )
+    base_lines.append(f'"@signature-params": {params}')
+    signature = private_key.sign("\n".join(base_lines).encode())
+    return _FakeRequest("GET", REQUEST_URL, {
+        "signature-agent": agent_header_override or agent_header,
+        "signature-input": f"sig1={params}",
+        "signature": f"sig1=:{base64.b64encode(signature).decode()}:",
+    })
+
+
 def main() -> int:
     failures = 0
 
@@ -115,10 +149,39 @@ def main() -> int:
             asyncio.run(appmain._verify_request_signature(req_c)),
             "failed",
         )
+
+        # Current draft: Signature-Agent as sf-dictionary, member covered via
+        # ;key= -> verified. (Pre-patch every such request came back 'failed',
+        # which is how all of AhrefsBot's signed traffic was logged.)
+        req_d = _signed_request_dictionary_form(private_key)
+        check(
+            "dictionary-form Signature-Agent, member covered",
+            asyncio.run(appmain._verify_request_signature(req_d)),
+            "verified",
+        )
+
+        # Dictionary form but the agent member is not covered -> failed.
+        req_e = _signed_request_dictionary_form(private_key, sign_agent_member=False)
+        check(
+            "dictionary-form Signature-Agent, member not covered",
+            asyncio.run(appmain._verify_request_signature(req_e)),
+            "failed",
+        )
+
+        # Member value swapped after signing -> failed. Guards against
+        # resolving the covered member to anything but its own value.
+        req_f = _signed_request_dictionary_form(
+            private_key, agent_header_override='agent1="https://attacker.example/jwks"'
+        )
+        check(
+            "dictionary-form Signature-Agent, member tampered",
+            asyncio.run(appmain._verify_request_signature(req_f)),
+            "failed",
+        )
     finally:
         appmain._get_jwks = original_get_jwks
 
-    total = 3
+    total = 6
     print(f"\n{total - failures}/{total} passed")
     return 0 if failures == 0 else 1
 
