@@ -405,24 +405,38 @@ async def _get_jwks(url: str) -> dict | None:
         return jwks
 
 
+def _jwk_thumbprint(jwk: dict) -> str:
+    # RFC 7638 / RFC 8037 §A.3: SHA-256 over the required members in
+    # lexicographic order, no whitespace. Web Bot Auth keyids are this value.
+    canonical = json.dumps({name: jwk[name] for name in ("crv", "kty", "x")},
+                           separators=(",", ":"), sort_keys=True)
+    digest = hashlib.sha256(canonical.encode()).digest()
+    return base64.urlsafe_b64encode(digest).decode().rstrip("=")
+
+
 class _JWKSKeyResolver(HTTPSignatureKeyResolver):
-    """Resolves a key id to an Ed25519 public key from a fetched JWKS set."""
+    """Resolves a keyid to an Ed25519 public key from a fetched JWKS set.
+
+    Each key is reachable by its kid and by its thumbprint: a directory at an
+    arbitrary URL may use kid as an operator label, and the draft (§5.5) has
+    the verifier fall back to computing thumbprints then."""
 
     def __init__(self, jwks: dict):
         self.keys: dict[str, Ed25519PublicKey] = {}
         for jwk in (jwks or {}).get("keys", []):
             if jwk.get("kty") != "OKP" or jwk.get("crv") != "Ed25519":
                 continue
-            kid = jwk.get("kid")
             x_b64 = jwk.get("x") or ""
-            if not kid or not x_b64:
+            if not x_b64:
                 continue
             padded = x_b64 + "=" * (-len(x_b64) % 4)
             try:
-                x_bytes = base64.urlsafe_b64decode(padded)
-                self.keys[kid] = Ed25519PublicKey.from_public_bytes(x_bytes)
+                public_key = Ed25519PublicKey.from_public_bytes(base64.urlsafe_b64decode(padded))
             except Exception:
                 continue
+            self.keys[_jwk_thumbprint(jwk)] = public_key
+            if jwk.get("kid"):
+                self.keys[jwk["kid"]] = public_key
 
     def resolve_public_key(self, key_id: str):
         if key_id not in self.keys:
@@ -430,43 +444,69 @@ class _JWKSKeyResolver(HTTPSignatureKeyResolver):
         return self.keys[key_id]
 
 
-# Bounds the JWKS fetches one request can trigger.
-MAX_SIGNATURE_AGENTS = 3
+# Bounds the signatures, and so the JWKS fetches, one request can trigger.
+MAX_SIGNATURE_LABELS = 3
+_TARGET_COMPONENTS = {"@authority", "@target-uri"}
 
 
-def _parse_signature_agent(raw: str) -> list[str]:
-    # Current drafts make Signature-Agent an sf-dictionary
-    # (agent1="https://..."); earlier ones used a bare sf-string, which some
-    # agents still send. Accept both.
+def _parse_sf_dictionary(raw: str) -> http_sfv.Dictionary | None:
+    dictionary = http_sfv.Dictionary()
     try:
-        dictionary = http_sfv.Dictionary()
         dictionary.parse(raw.encode())
-        urls = [member.value for member in dictionary.values()
-                if isinstance(getattr(member, "value", None), str)]
-        return urls[:MAX_SIGNATURE_AGENTS]
     except Exception:
-        pass
-    try:
-        item = http_sfv.Item()
-        item.parse(raw.encode())
-        return [item.value] if isinstance(item.value, str) else []
-    except Exception:
-        return []
+        return None
+    return dictionary
 
 
-def _covers_required_components(covered_component_keys) -> bool:
-    # Web Bot Auth draft §4: @authority and Signature-Agent MUST be covered.
-    # The agent component may carry ;key="member" in the dictionary form, so
-    # compare component names, not serialised keys.
-    names = set()
-    for component_key in covered_component_keys:
-        item = http_sfv.Item()
+def _signature_agent_url(agent_raw: str, label: str, member_key: str | None) -> str | None:
+    """The directory URL for one signature, per draft-ietf-webbotauth-httpsig-
+    protocol-01 §5.2.1: the Signature-Agent member that signature covers.
+
+    The current form is an sf-dictionary keyed by signature label; members
+    with parameters MUST be ignored and only https is allowed. The legacy
+    bare sf-string is read as a one-member dictionary keyed by the label."""
+    agents = _parse_sf_dictionary(agent_raw)
+    if agents is not None:
+        member = agents.get(member_key or label)
+        if member is None or member.params or not isinstance(member.value, str):
+            return None
+        url = member.value
+    else:
+        legacy = http_sfv.Item()
         try:
-            item.parse(component_key.encode())
+            legacy.parse(agent_raw.encode())
         except Exception:
-            continue
-        names.add(item.value)
-    return {"@authority", "signature-agent"}.issubset(names)
+            return None
+        if member_key is not None or not isinstance(legacy.value, str):
+            return None
+        url = legacy.value
+    return url if url.startswith("https://") else None
+
+
+async def _verify_one_label(request: Request, label: str, signature_input, signature) -> bool:
+    components = {item.value: item for item in signature_input}
+    agent_component = components.get("signature-agent")
+    if agent_component is None or not _TARGET_COMPONENTS & components.keys():
+        return False
+    agent_url = _signature_agent_url(
+        request.headers.get("signature-agent") or "", label, agent_component.params.get("key")
+    )
+    if agent_url is None:
+        return False
+    resolver = _JWKSKeyResolver(await _get_jwks(agent_url))
+    if not resolver.keys:
+        return False
+    # Hand the library only this label's members, so the key looked up for it
+    # cannot verify a different signature in the same request.
+    one_input, one_signature = http_sfv.Dictionary(), http_sfv.Dictionary()
+    one_input[label], one_signature[label] = signature_input, signature
+    headers = {**request.headers, "signature-input": str(one_input), "signature": str(one_signature)}
+    verifier = HTTPMessageVerifier(signature_algorithm=algorithms.ED25519, key_resolver=resolver)
+    try:
+        verifier.verify(httpx.Request(method=request.method, url=str(request.url), headers=headers))
+    except Exception:
+        return False
+    return True
 
 
 async def _verify_request_signature(request: Request) -> str | None:
@@ -474,36 +514,15 @@ async def _verify_request_signature(request: Request) -> str | None:
     headers = request.headers
     if "signature" not in headers or "signature-input" not in headers:
         return None
-    agent_raw = headers.get("signature-agent")
-    if not agent_raw:
+    signature_inputs = _parse_sf_dictionary(headers["signature-input"])
+    signatures = _parse_sf_dictionary(headers["signature"])
+    if not signature_inputs or not signatures:
         return "failed"
-    agent_urls = _parse_signature_agent(agent_raw)
-    if not agent_urls:
-        return "failed"
-    directories = await asyncio.gather(*(_get_jwks(url) for url in agent_urls))
-    merged_keys = [key for jwks in directories if jwks for key in jwks.get("keys", [])]
-    resolver = _JWKSKeyResolver({"keys": merged_keys})
-    if not resolver.keys:
-        return "failed"
-    verifier = HTTPMessageVerifier(
-        signature_algorithm=algorithms.ED25519,
-        key_resolver=resolver,
-    )
-    httpx_req = httpx.Request(
-        method=request.method,
-        url=str(request.url),
-        headers=dict(headers),
-    )
-    try:
-        results = verifier.verify(httpx_req)
-    except Exception:
-        return "failed"
-
-    # Verified only when at least one label covers both required components.
-    if not any(_covers_required_components(result.covered_components) for result in results):
-        return "failed"
-
-    return "verified"
+    labels = [label for label in signature_inputs if label in signatures][:MAX_SIGNATURE_LABELS]
+    for label in labels:
+        if await _verify_one_label(request, label, signature_inputs[label], signatures[label]):
+            return "verified"
+    return "failed"
 
 
 # Declared before rate_limit_middleware so rate_limit wraps it from outside —
