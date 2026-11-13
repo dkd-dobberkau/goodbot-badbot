@@ -483,19 +483,37 @@ def _signature_agent_url(agent_raw: str, label: str, member_key: str | None) -> 
     return url if url.startswith("https://") else None
 
 
+SIGNATURE_LOG_HEADER_CHARS = 300
+
+
+def _signature_failure(request: Request, label: str, stage: str, detail: str = "") -> bool:
+    # The status column only says 'failed'; this records why, so a signer that
+    # never verifies (AhrefsBot, 2026-11) can be diagnosed from the container
+    # log. Headers are truncated because callers control them. Warning level
+    # because uvicorn leaves the root logger at its default, which drops info.
+    log.warning(
+        "signature failed: stage=%s label=%r detail=%r url=%r "
+        "signature-input=%r signature-agent=%r",
+        stage, label, detail[:SIGNATURE_LOG_HEADER_CHARS], str(request.url),
+        (request.headers.get("signature-input") or "")[:SIGNATURE_LOG_HEADER_CHARS],
+        (request.headers.get("signature-agent") or "")[:SIGNATURE_LOG_HEADER_CHARS],
+    )
+    return False
+
+
 async def _verify_one_label(request: Request, label: str, signature_input, signature) -> bool:
     components = {item.value: item for item in signature_input}
     agent_component = components.get("signature-agent")
     if agent_component is None or not _TARGET_COMPONENTS & components.keys():
-        return False
+        return _signature_failure(request, label, "components", ",".join(components))
     agent_url = _signature_agent_url(
         request.headers.get("signature-agent") or "", label, agent_component.params.get("key")
     )
     if agent_url is None:
-        return False
+        return _signature_failure(request, label, "agent-url")
     resolver = _JWKSKeyResolver(await _get_jwks(agent_url))
     if not resolver.keys:
-        return False
+        return _signature_failure(request, label, "jwks", agent_url)
     # Hand the library only this label's members, so the key looked up for it
     # cannot verify a different signature in the same request.
     one_input, one_signature = http_sfv.Dictionary(), http_sfv.Dictionary()
@@ -504,8 +522,8 @@ async def _verify_one_label(request: Request, label: str, signature_input, signa
     verifier = HTTPMessageVerifier(signature_algorithm=algorithms.ED25519, key_resolver=resolver)
     try:
         verifier.verify(httpx.Request(method=request.method, url=str(request.url), headers=headers))
-    except Exception:
-        return False
+    except Exception as exc:
+        return _signature_failure(request, label, "verify", f"{type(exc).__name__}: {exc}")
     return True
 
 

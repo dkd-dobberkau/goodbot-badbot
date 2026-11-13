@@ -12,7 +12,9 @@ Exit 0 if all assertions pass, 1 otherwise.
 """
 import asyncio
 import base64
+import contextlib
 import datetime
+import logging
 import sys
 import time
 
@@ -60,6 +62,23 @@ class _FakeRequest:
         self.method = method
         self.url = url
         self.headers = headers
+
+
+@contextlib.contextmanager
+def _captured_warnings():
+    """Collects the messages appmain.log emits while the block runs."""
+    messages: list[str] = []
+
+    class _Collector(logging.Handler):
+        def emit(self, record):
+            messages.append(record.getMessage())
+
+    handler = _Collector(level=logging.WARNING)
+    appmain.log.addHandler(handler)
+    try:
+        yield messages
+    finally:
+        appmain.log.removeHandler(handler)
 
 
 def _signed_request(private_key: Ed25519PrivateKey, covered: tuple[str, ...]) -> _FakeRequest:
@@ -207,6 +226,16 @@ def main() -> int:
         check("legacy: neither @authority nor @target-uri covered",
               verify(_signed_request(private_key, ("@method", "signature-agent"))),
               "failed")
+
+        # A failure must log the stage it stopped at, or a signer that never
+        # verifies cannot be diagnosed from production.
+        with _captured_warnings() as messages:
+            verify(_signed_request(private_key, ("@method", "signature-agent")))
+        check("failure logs its stage",
+              any("stage=components" in m and "signature-input=" in m for m in messages), True)
+        with _captured_warnings() as messages:
+            verify(_signed_request(private_key, ("@authority", "signature-agent")))
+        check("success logs nothing", messages, [])
 
         # Dictionary form (pre-patch every one of these came back 'failed',
         # which is how all of AhrefsBot's signed traffic was logged).
