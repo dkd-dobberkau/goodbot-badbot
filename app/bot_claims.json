@@ -5,8 +5,49 @@
       "PetalBot"
     ],
     "cloudflare_slug": "petalbot",
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "obeys",
+          "source": "operator-docs",
+          "url": "https://webmaster.petalsearch.com/site/petalbot",
+          "retrieved": "2026-11-17",
+          "note": "\"PetalBot complies with the Internet robots protocol\""
+        },
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/petalbot",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "reverse DNS, then forward DNS back to the same IP",
+          "source": "operator-docs",
+          "url": "https://webmaster.petalsearch.com/site/petalbot",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://webmaster.petalsearch.com/site/petalbot",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt",
+          "source": "operator-docs",
+          "url": "https://webmaster.petalsearch.com/site/petalbot",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "gptbot": {
     "name": "GPTBot",
@@ -14,8 +55,49 @@
       "GPTBot"
     ],
     "cloudflare_slug": "gptbot",
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "operator-docs",
+          "url": "https://developers.openai.com/api/docs/bots",
+          "retrieved": "2026-11-17",
+          "note": "Only: \"Disallowing GPTBot indicates a site's content should not be used in training generative AI foundation models.\""
+        },
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/gptbot",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "published IP ranges: https://openai.com/gptbot.json",
+          "source": "operator-docs",
+          "url": "https://developers.openai.com/api/docs/bots",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://developers.openai.com/api/docs/bots",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "disallow GPTBot in robots.txt",
+          "source": "operator-docs",
+          "url": "https://developers.openai.com/api/docs/bots",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "meta-externalagent": {
     "name": "Meta-ExternalAgent",
@@ -23,8 +105,49 @@
       "Meta-ExternalAgent"
     ],
     "cloudflare_slug": "meta-externalagent",
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "operator-docs",
+          "url": "https://developers.facebook.com/docs/sharing/webmasters/web-crawlers",
+          "retrieved": "2026-11-17",
+          "note": "Only: \"In order to block these crawlers, add a disallow for the relevant crawler to robots.txt.\""
+        },
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/meta-externalagent",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "user agent only; no IP list or reverse DNS stated",
+          "source": "operator-docs",
+          "url": "https://developers.facebook.com/docs/sharing/webmasters/web-crawlers",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://developers.facebook.com/docs/sharing/webmasters/web-crawlers",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "disallow meta-externalagent in robots.txt; up to 24 hours",
+          "source": "operator-docs",
+          "url": "https://developers.facebook.com/docs/sharing/webmasters/web-crawlers",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "chatgpt-user": {
     "name": "ChatGPT-User",
@@ -32,8 +155,49 @@
       "ChatGPT-User"
     ],
     "cloudflare_slug": "chatgpt-user",
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "does-not-obey",
+          "source": "operator-docs",
+          "url": "https://developers.openai.com/api/docs/bots",
+          "retrieved": "2026-11-17",
+          "note": "\"Because these actions are initiated by a user, robots.txt rules may not apply.\""
+        },
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/chatgpt-user",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "published IP ranges: https://openai.com/chatgpt-user.json",
+          "source": "operator-docs",
+          "url": "https://developers.openai.com/api/docs/bots",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://developers.openai.com/api/docs/bots",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://developers.openai.com/api/docs/bots",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "claudebot": {
     "name": "ClaudeBot",
@@ -41,8 +205,42 @@
       "ClaudeBot"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "obeys",
+          "source": "operator-docs",
+          "url": "https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler",
+          "retrieved": "2026-11-17",
+          "note": "\"Anthropic's Bots respect \"do not crawl\" signals by honoring industry standard directives in robots.txt.\""
+        }
+      ],
+      "recognition": [
+        {
+          "value": "published IP list: https://claude.com/crawling/bots.json",
+          "source": "operator-docs",
+          "url": "https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "disallow ClaudeBot in robots.txt on every subdomain",
+          "source": "operator-docs",
+          "url": "https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "oai-searchbot": {
     "name": "OAI-SearchBot",
@@ -50,8 +248,49 @@
       "OAI-SearchBot"
     ],
     "cloudflare_slug": "oai-searchbot",
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "operator-docs",
+          "url": "https://developers.openai.com/api/docs/bots",
+          "retrieved": "2026-11-17",
+          "note": "Describes robots.txt as the opt-out: \"Sites that are opted out of OAI-SearchBot will not be shown in ChatGPT search answers.\""
+        },
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/oai-searchbot",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "published IP ranges: https://openai.com/searchbot.json",
+          "source": "operator-docs",
+          "url": "https://developers.openai.com/api/docs/bots",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://developers.openai.com/api/docs/bots",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "disallow OAI-SearchBot in robots.txt; ~24 hours to take effect",
+          "source": "operator-docs",
+          "url": "https://developers.openai.com/api/docs/bots",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "amazonbot": {
     "name": "Amazonbot",
@@ -59,8 +298,49 @@
       "Amazonbot"
     ],
     "cloudflare_slug": "amazon-bot",
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "obeys",
+          "source": "operator-docs",
+          "url": "https://developer.amazon.com/support/amazonbot",
+          "retrieved": "2026-11-17",
+          "note": "\"Automated crawling from these listed user agents respects the Robots Exclusion Protocol\""
+        },
+        {
+          "value": "obeys",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/amazon-bot",
+          "retrieved": "2026-11-17",
+          "note": "Only in the operator-supplied description shown on Radar: \"Amazonbot is a polite crawler that respects standard robots.txt rules and robots meta tags.\""
+        }
+      ],
+      "recognition": [
+        {
+          "value": "published IP list: https://developer.amazon.com/amazonbot/ip-addresses/",
+          "source": "operator-docs",
+          "url": "https://developer.amazon.com/support/amazonbot",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://developer.amazon.com/support/amazonbot",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt; noarchive meta tag to exclude model training",
+          "source": "operator-docs",
+          "url": "https://developer.amazon.com/support/amazonbot",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "bytespider": {
     "name": "Bytespider",
@@ -77,8 +357,49 @@
       "Applebot"
     ],
     "cloudflare_slug": "apple",
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "obeys",
+          "source": "operator-docs",
+          "url": "https://support.apple.com/en-us/119829",
+          "retrieved": "2026-11-17",
+          "note": "\"Applebot respects standard robots.txt directives in general search crawls that are targeted at Applebot.\" Does not follow crawl-delay."
+        },
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/apple",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "reverse DNS *.applebot.apple.com; IP list applebot.json (http URL)",
+          "source": "operator-docs",
+          "url": "https://support.apple.com/en-us/119829",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://support.apple.com/en-us/119829",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "disallow Applebot in robots.txt; Applebot-Extended for training",
+          "source": "operator-docs",
+          "url": "https://support.apple.com/en-us/119829",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "shapbot": {
     "name": "ShapBot",
@@ -86,8 +407,49 @@
       "ShapBot"
     ],
     "cloudflare_slug": "shapbot",
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "obeys",
+          "source": "operator-docs",
+          "url": "https://docs.parallel.ai/resources/crawler",
+          "retrieved": "2026-11-17",
+          "note": "\"ShapBot follows the rules in the User-agent: ShapBot group, or the * group if no ShapBot group exists.\""
+        },
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/shapbot",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "published IP list: https://docs.parallel.ai/resources/shapbot.json",
+          "source": "operator-docs",
+          "url": "https://docs.parallel.ai/resources/crawler",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "signs with Web Bot Auth; key directory at shapbot.parallel.ai",
+          "source": "operator-docs",
+          "url": "https://docs.parallel.ai/resources/crawler",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt; Crawl-delay to slow it",
+          "source": "operator-docs",
+          "url": "https://docs.parallel.ai/resources/crawler",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "claude-user": {
     "name": "Claude-User",
@@ -95,8 +457,42 @@
       "Claude-User"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "obeys",
+          "source": "operator-docs",
+          "url": "https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler",
+          "retrieved": "2026-11-17",
+          "note": "Same statement, made for all Anthropic bots."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "published IP list: https://claude.com/crawling/bots.json",
+          "source": "operator-docs",
+          "url": "https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt (no example line given for Claude-User)",
+          "source": "operator-docs",
+          "url": "https://support.claude.com/en/articles/8896518-does-anthropic-crawl-data-from-the-web-and-how-can-site-owners-block-the-crawler",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "perplexitybot": {
     "name": "PerplexityBot",
@@ -104,8 +500,42 @@
       "PerplexityBot"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "operator-docs",
+          "url": "https://docs.perplexity.ai/guides/bots",
+          "retrieved": "2026-11-17",
+          "note": "Only: webmasters \"can use the following robots.txt tags to manage how their sites and content interact with Perplexity\"."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "published IP list: https://www.perplexity.ai/perplexitybot.json",
+          "source": "operator-docs",
+          "url": "https://docs.perplexity.ai/guides/bots",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://docs.perplexity.ai/guides/bots",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://docs.perplexity.ai/guides/bots",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "bravebot": {
     "name": "BraveBot",
@@ -113,8 +543,49 @@
       "BraveBot"
     ],
     "cloudflare_slug": "bravebot",
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "operator-docs",
+          "url": "https://search.brave.com/help/brave-search-crawler",
+          "retrieved": "2026-11-17",
+          "note": "Says it will not crawl a page Googlebot cannot crawl, and \"robots.txt is not used to prevent a page from being indexed\"."
+        },
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/bravebot",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "\"does not advertise a differentiated user agent\"",
+          "source": "operator-docs",
+          "url": "https://search.brave.com/help/brave-search-crawler",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://search.brave.com/help/brave-search-crawler",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "noindex to delist; no crawl opt-out stated",
+          "source": "operator-docs",
+          "url": "https://search.brave.com/help/brave-search-crawler",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "awariosmartbot": {
     "name": "AwarioSmartBot",
@@ -122,8 +593,49 @@
       "AwarioSmartBot"
     ],
     "cloudflare_slug": "awario",
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "obeys",
+          "source": "operator-docs",
+          "url": "https://awario.com/bots.html",
+          "retrieved": "2026-11-17",
+          "note": "\"The bots respect rules you specify in your robots.txt file.\""
+        },
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/awario",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "user agent only: \"do not try to identify the bots via IP\"",
+          "source": "operator-docs",
+          "url": "https://awario.com/bots.html",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://awario.com/bots.html",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt",
+          "source": "operator-docs",
+          "url": "https://awario.com/bots.html",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "google-cloudvertexbot": {
     "name": "Google-CloudVertexBot",
@@ -131,8 +643,49 @@
       "Google-CloudVertexBot"
     ],
     "cloudflare_slug": "google-cloudvertexbot",
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "obeys",
+          "source": "operator-docs",
+          "url": "https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers",
+          "retrieved": "2026-11-17",
+          "note": "Listed among the common crawlers that \"always obey robots.txt rules when crawling automatically\"."
+        },
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/google-cloudvertexbot",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "IP ranges in common-crawlers.json; reverse DNS *.googlebot.com",
+          "source": "operator-docs",
+          "url": "https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt token Google-CloudVertexBot; no effect on Google Search",
+          "source": "operator-docs",
+          "url": "https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "googleother": {
     "name": "GoogleOther",
@@ -140,8 +693,49 @@
       "GoogleOther"
     ],
     "cloudflare_slug": "google-other",
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "obeys",
+          "source": "operator-docs",
+          "url": "https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers",
+          "retrieved": "2026-11-17",
+          "note": "Common crawlers \"always obey robots.txt rules when crawling automatically\"."
+        },
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/google-other",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "IP ranges in common-crawlers.json; reverse DNS *.googlebot.com",
+          "source": "operator-docs",
+          "url": "https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt token GoogleOther",
+          "source": "operator-docs",
+          "url": "https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "youbot": {
     "name": "YouBot",
@@ -149,8 +743,49 @@
       "YouBot"
     ],
     "cloudflare_slug": "youbot",
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "obeys",
+          "source": "operator-docs",
+          "url": "https://you.com/docs/youbot",
+          "retrieved": "2026-11-17",
+          "note": "\"Yes, YouBot fully respects robots.txt directives, including user-agent specific rules and crawl-delay settings.\""
+        },
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/youbot",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "68.67.112.0/24; reverse DNS youbot-*.search.you.com",
+          "source": "operator-docs",
+          "url": "https://you.com/docs/youbot",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "signs with Web Bot Auth; keys at https://you.com/.well-known/http-message-signatures-directory",
+          "source": "operator-docs",
+          "url": "https://you.com/docs/youbot",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "disallow YouBot in robots.txt; up to 30 minutes",
+          "source": "operator-docs",
+          "url": "https://you.com/docs/youbot",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "ccbot": {
     "name": "CCBot",
@@ -158,8 +793,42 @@
       "CCBot"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "operator-docs",
+          "url": "https://commoncrawl.org/ccbot",
+          "retrieved": "2026-11-17",
+          "note": "Only gives robots.txt as the way to block it."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "published IP list: https://index.commoncrawl.org/ccbot.json; reverse DNS *.crawl.commoncrawl.org (IPv4 only)",
+          "source": "operator-docs",
+          "url": "https://commoncrawl.org/ccbot",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://commoncrawl.org/ccbot",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "disallow CCBot in robots.txt; opt-out registry",
+          "source": "operator-docs",
+          "url": "https://commoncrawl.org/ccbot",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "cohere-ai": {
     "name": "cohere-ai",
@@ -167,8 +836,18 @@
       "cohere-ai"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "operator-docs",
+          "url": "https://docs.cohere.com/docs/cohere-web-crawlers",
+          "retrieved": "2026-11-17",
+          "note": "The page does not name cohere-ai; it names only Coherebot and says \"It is Cohere's policy to require that crawlers be designed to respect robots.txt.\""
+        }
+      ]
+    }
   },
   "google-extended": {
     "name": "Google-Extended",
@@ -176,8 +855,42 @@
       "Google-Extended"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "operator-docs",
+          "url": "https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers",
+          "retrieved": "2026-11-17",
+          "note": "A control token, not a crawler: \"Google-Extended doesn't have a separate HTTP request user agent string.\""
+        }
+      ],
+      "recognition": [
+        {
+          "value": "no own user agent; uses existing Google user agents",
+          "source": "operator-docs",
+          "url": "https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt token Google-Extended (Gemini training and grounding)",
+          "source": "operator-docs",
+          "url": "https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "chatglm-spider": {
     "name": "ChatGLM-Spider",
@@ -185,7 +898,7 @@
       "ChatGLM-Spider"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
+    "docs_recorded": true,
     "claims": {}
   },
   "meta-externalfetcher": {
@@ -194,8 +907,49 @@
       "Meta-ExternalFetcher"
     ],
     "cloudflare_slug": "meta-externalfetcher",
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "does-not-obey",
+          "source": "operator-docs",
+          "url": "https://developers.facebook.com/docs/sharing/webmasters/web-crawlers",
+          "retrieved": "2026-11-17",
+          "note": "\"this crawler may bypass robots.txt rules\""
+        },
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/meta-externalfetcher",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "user agent only; no IP list or reverse DNS stated",
+          "source": "operator-docs",
+          "url": "https://developers.facebook.com/docs/sharing/webmasters/web-crawlers",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://developers.facebook.com/docs/sharing/webmasters/web-crawlers",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://developers.facebook.com/docs/sharing/webmasters/web-crawlers",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "deepseekbot": {
     "name": "DeepSeekBot",
@@ -203,7 +957,7 @@
       "DeepSeekBot"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
+    "docs_recorded": true,
     "claims": {}
   },
   "semrushbot": {
@@ -213,7 +967,17 @@
     ],
     "cloudflare_slug": "semrush-bl",
     "docs_recorded": false,
-    "claims": {}
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/semrush-bl",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ]
+    }
   },
   "ahrefsbot": {
     "name": "AhrefsBot",
@@ -221,8 +985,50 @@
       "AhrefsBot"
     ],
     "cloudflare_slug": "ahrefsbot",
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "obeys",
+          "source": "operator-docs",
+          "url": "https://ahrefs.com/robot",
+          "retrieved": "2026-11-17",
+          "note": "\"Both bots strictly respect robots.txt on both disallow and allow rules, as well as crawl-delay directives.\""
+        },
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/ahrefsbot",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "IP lists via api.ahrefs.com; reverse DNS ahrefs.com / ahrefs.net",
+          "source": "operator-docs",
+          "url": "https://ahrefs.com/robot",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://ahrefs.com/robot",
+          "retrieved": "2026-11-17",
+          "note": "AhrefsBot does send Web Bot Auth signatures here."
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "disallow AhrefsBot in robots.txt; Crawl-Delay",
+          "source": "operator-docs",
+          "url": "https://ahrefs.com/robot",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "mj12bot": {
     "name": "MJ12bot",
@@ -231,7 +1037,17 @@
     ],
     "cloudflare_slug": "mj12bot",
     "docs_recorded": false,
-    "claims": {}
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/mj12bot",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ]
+    }
   },
   "dotbot": {
     "name": "DotBot",
@@ -240,7 +1056,17 @@
     ],
     "cloudflare_slug": "dotbot",
     "docs_recorded": false,
-    "claims": {}
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/dotbot",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ]
+    }
   },
   "serankingbacklinksbot": {
     "name": "SERankingBacklinksBot",
@@ -249,7 +1075,17 @@
     ],
     "cloudflare_slug": "serankingbacklinksbot",
     "docs_recorded": false,
-    "claims": {}
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/serankingbacklinksbot",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ]
+    }
   },
   "seranking": {
     "name": "SERanking",
@@ -285,7 +1121,17 @@
     ],
     "cloudflare_slug": "google",
     "docs_recorded": false,
-    "claims": {}
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/google",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ]
+    }
   },
   "bingbot": {
     "name": "bingbot",
@@ -294,7 +1140,17 @@
     ],
     "cloudflare_slug": "bing",
     "docs_recorded": false,
-    "claims": {}
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/bing",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ]
+    }
   },
   "baiduspider": {
     "name": "Baiduspider",
@@ -303,7 +1159,17 @@
     ],
     "cloudflare_slug": "baidu",
     "docs_recorded": false,
-    "claims": {}
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/baidu",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ]
+    }
   },
   "yandexbot": {
     "name": "YandexBot",
@@ -312,7 +1178,17 @@
     ],
     "cloudflare_slug": "yandex",
     "docs_recorded": false,
-    "claims": {}
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/yandex",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ]
+    }
   },
   "seznambot": {
     "name": "SeznamBot",
@@ -321,7 +1197,17 @@
     ],
     "cloudflare_slug": "seznam",
     "docs_recorded": false,
-    "claims": {}
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/seznam",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ]
+    }
   },
   "duckduckbot": {
     "name": "DuckDuckBot",
@@ -330,7 +1216,17 @@
     ],
     "cloudflare_slug": "duckduckbot",
     "docs_recorded": false,
-    "claims": {}
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/duckduckbot",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ]
+    }
   },
   "sogou-spider": {
     "name": "Sogou Spider",
@@ -348,7 +1244,17 @@
     ],
     "cloudflare_slug": "builtwith",
     "docs_recorded": false,
-    "claims": {}
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/builtwith",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ]
+    }
   },
   "dataprovider": {
     "name": "Dataprovider",
@@ -357,7 +1263,17 @@
     ],
     "cloudflare_slug": "dataprovider-com",
     "docs_recorded": false,
-    "claims": {}
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/dataprovider-com",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ]
+    }
   },
   "heritrix": {
     "name": "Heritrix",
@@ -402,7 +1318,17 @@
     ],
     "cloudflare_slug": "iboubot-3",
     "docs_recorded": false,
-    "claims": {}
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/iboubot-3",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ]
+    }
   },
   "barkrowler": {
     "name": "Barkrowler",
@@ -410,8 +1336,50 @@
       "Barkrowler"
     ],
     "cloudflare_slug": "babbar-barkrowler",
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "obeys",
+          "source": "operator-docs",
+          "url": "https://babbar.tech/crawler",
+          "retrieved": "2026-11-17",
+          "note": "\"Yes. We respect robots.txt file (using crawler-commons tool set) and disallow directives.\""
+        },
+        {
+          "value": "no-statement",
+          "source": "cloudflare",
+          "url": "https://radar.cloudflare.com/bots/directory/babbar-barkrowler",
+          "retrieved": "2026-11-17",
+          "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "IP ranges: https://www.babbar.tech/barkrowler-ip-ranges.json; reverse DNS babbar.eu",
+          "source": "operator-docs",
+          "url": "https://babbar.tech/crawler",
+          "retrieved": "2026-11-17"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "source": "operator-docs",
+          "url": "https://babbar.tech/crawler",
+          "retrieved": "2026-11-17",
+          "note": "Barkrowler does send Web Bot Auth signatures here, and some verified."
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "disallow barkrowler in robots.txt; Crawl-Delay",
+          "source": "operator-docs",
+          "url": "https://babbar.tech/crawler",
+          "retrieved": "2026-11-17"
+        }
+      ]
+    }
   },
   "geedoshopproductfinder": {
     "name": "GeedoShopProductFinder",
