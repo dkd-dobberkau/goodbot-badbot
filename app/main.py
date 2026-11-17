@@ -13,6 +13,7 @@ import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 
 import aiomysql
 import http_sfv
@@ -458,6 +459,9 @@ def _parse_sf_dictionary(raw: str) -> http_sfv.Dictionary | None:
     return dictionary
 
 
+SIGNATURE_DIRECTORY_PATH = "/.well-known/http-message-signatures-directory"
+
+
 def _signature_agent_url(agent_raw: str, label: str, member_key: str | None) -> str | None:
     """The directory URL for one signature, per draft-ietf-webbotauth-httpsig-
     protocol-01 §5.2.1: the Signature-Agent member that signature covers.
@@ -480,7 +484,16 @@ def _signature_agent_url(agent_raw: str, label: str, member_key: str | None) -> 
         if member_key is not None or not isinstance(legacy.value, str):
             return None
         url = legacy.value
-    return url if url.startswith("https://") else None
+    if not url.startswith("https://"):
+        return None
+    # The spec says to fetch the member as given, but its own example
+    # (meunier-05 A.3) is a bare origin, and AhrefsBot and ibou send exactly
+    # that. Fetched as given it returns their homepage, so every one of their
+    # signatures failed at the jwks stage (2026-11).
+    parts = urlsplit(url)
+    if parts.path in ("", "/"):
+        return parts._replace(path=SIGNATURE_DIRECTORY_PATH).geturl()
+    return url
 
 
 SIGNATURE_LOG_HEADER_CHARS = 300

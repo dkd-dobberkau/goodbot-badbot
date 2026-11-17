@@ -36,6 +36,8 @@ import app.main as appmain
 
 KID = "test-key-1"
 AGENT_URL = "https://agent.example/jwks"
+AGENT_ORIGIN = "https://origin.example"
+AGENT_ORIGIN_DIRECTORY = "https://origin.example/.well-known/http-message-signatures-directory"
 OTHER_AGENT_URL = "https://other.example/jwks"
 REQUEST_URL = "https://goodbot-badbot.com/robots.txt"
 
@@ -81,11 +83,14 @@ def _captured_warnings():
         appmain.log.removeHandler(handler)
 
 
-def _signed_request(private_key: Ed25519PrivateKey, covered: tuple[str, ...]) -> _FakeRequest:
+def _signed_request(
+    private_key: Ed25519PrivateKey,
+    covered: tuple[str, ...],
+    agent_header: str = str(http_sfv.Item(AGENT_URL)),  # sf-string, e.g. "https://..."
+) -> _FakeRequest:
     """Legacy form: Signature-Agent as a bare sf-string, signed via the
     library. Always carries the header so the JWKS path runs regardless of
     whether signature-agent is part of the covered set."""
-    agent_header = str(http_sfv.Item(AGENT_URL))  # sf-string, e.g. "https://..."
     req = httpx.Request("GET", REQUEST_URL, headers={"signature-agent": agent_header})
     signer = HTTPMessageSigner(
         signature_algorithm=algorithms.ED25519,
@@ -208,6 +213,7 @@ def main() -> int:
     directories = {
         AGENT_URL: {"keys": [{**signing_jwk, "kid": KID}]},
         OTHER_AGENT_URL: {"keys": [unrelated_jwk]},
+        AGENT_ORIGIN_DIRECTORY: {"keys": [{**signing_jwk, "kid": KID}]},
     }
     original_get_jwks = appmain._get_jwks
 
@@ -262,6 +268,23 @@ def main() -> int:
                   private_key,
                   agent_header=f'sig1="{OTHER_AGENT_URL}", other="{AGENT_URL}"')),
               "failed")
+
+        # A bare origin (meunier-05 A.3's example shape, sent by AhrefsBot and
+        # ibou in 2026-11) resolves to the origin's well-known directory.
+        check("legacy: bare origin, quoted (AhrefsBot)",
+              verify(_signed_request(private_key, ("@authority", "signature-agent"),
+                                     agent_header=f'"{AGENT_ORIGIN}"')),
+              "verified")
+        check("legacy: bare origin, unquoted (ibou)",
+              verify(_signed_request(private_key, ("@authority", "signature-agent"),
+                                     agent_header=AGENT_ORIGIN)),
+              "verified")
+        check("dictionary: bare origin with trailing slash",
+              verify(_signed_request_dictionary_form(
+                  private_key, agent_header=f'sig1="{AGENT_ORIGIN}/"')),
+              "verified")
+        check("agent url with a path is fetched as given",
+              appmain._signature_agent_url(f'"{AGENT_URL}"', "sig1", None), AGENT_URL)
 
         # §5.2.1: a member that carries parameters MUST be ignored.
         check("dictionary: covered member carries parameters",
