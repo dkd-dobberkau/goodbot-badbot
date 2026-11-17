@@ -1,0 +1,461 @@
+{
+  "petalbot": {
+    "name": "PetalBot",
+    "match": [
+      "PetalBot"
+    ],
+    "cloudflare_slug": "petalbot",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "gptbot": {
+    "name": "GPTBot",
+    "match": [
+      "GPTBot"
+    ],
+    "cloudflare_slug": "gptbot",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "meta-externalagent": {
+    "name": "Meta-ExternalAgent",
+    "match": [
+      "Meta-ExternalAgent"
+    ],
+    "cloudflare_slug": "meta-externalagent",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "chatgpt-user": {
+    "name": "ChatGPT-User",
+    "match": [
+      "ChatGPT-User"
+    ],
+    "cloudflare_slug": "chatgpt-user",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "claudebot": {
+    "name": "ClaudeBot",
+    "match": [
+      "ClaudeBot"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "oai-searchbot": {
+    "name": "OAI-SearchBot",
+    "match": [
+      "OAI-SearchBot"
+    ],
+    "cloudflare_slug": "oai-searchbot",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "amazonbot": {
+    "name": "Amazonbot",
+    "match": [
+      "Amazonbot"
+    ],
+    "cloudflare_slug": "amazon-bot",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "bytespider": {
+    "name": "Bytespider",
+    "match": [
+      "Bytespider"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "applebot": {
+    "name": "Applebot",
+    "match": [
+      "Applebot"
+    ],
+    "cloudflare_slug": "apple",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "shapbot": {
+    "name": "ShapBot",
+    "match": [
+      "ShapBot"
+    ],
+    "cloudflare_slug": "shapbot",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "claude-user": {
+    "name": "Claude-User",
+    "match": [
+      "Claude-User"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "perplexitybot": {
+    "name": "PerplexityBot",
+    "match": [
+      "PerplexityBot"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "bravebot": {
+    "name": "BraveBot",
+    "match": [
+      "BraveBot"
+    ],
+    "cloudflare_slug": "bravebot",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "awariosmartbot": {
+    "name": "AwarioSmartBot",
+    "match": [
+      "AwarioSmartBot"
+    ],
+    "cloudflare_slug": "awario",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "google-cloudvertexbot": {
+    "name": "Google-CloudVertexBot",
+    "match": [
+      "Google-CloudVertexBot"
+    ],
+    "cloudflare_slug": "google-cloudvertexbot",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "googleother": {
+    "name": "GoogleOther",
+    "match": [
+      "GoogleOther"
+    ],
+    "cloudflare_slug": "google-other",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "youbot": {
+    "name": "YouBot",
+    "match": [
+      "YouBot"
+    ],
+    "cloudflare_slug": "youbot",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "ccbot": {
+    "name": "CCBot",
+    "match": [
+      "CCBot"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "cohere-ai": {
+    "name": "cohere-ai",
+    "match": [
+      "cohere-ai"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "google-extended": {
+    "name": "Google-Extended",
+    "match": [
+      "Google-Extended"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "chatglm-spider": {
+    "name": "ChatGLM-Spider",
+    "match": [
+      "ChatGLM-Spider"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "meta-externalfetcher": {
+    "name": "Meta-ExternalFetcher",
+    "match": [
+      "Meta-ExternalFetcher"
+    ],
+    "cloudflare_slug": "meta-externalfetcher",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "deepseekbot": {
+    "name": "DeepSeekBot",
+    "match": [
+      "DeepSeekBot"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "semrushbot": {
+    "name": "SemrushBot",
+    "match": [
+      "SemrushBot"
+    ],
+    "cloudflare_slug": "semrush-bl",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "ahrefsbot": {
+    "name": "AhrefsBot",
+    "match": [
+      "AhrefsBot"
+    ],
+    "cloudflare_slug": "ahrefsbot",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "mj12bot": {
+    "name": "MJ12bot",
+    "match": [
+      "MJ12bot"
+    ],
+    "cloudflare_slug": "mj12bot",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "dotbot": {
+    "name": "DotBot",
+    "match": [
+      "DotBot"
+    ],
+    "cloudflare_slug": "dotbot",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "serankingbacklinksbot": {
+    "name": "SERankingBacklinksBot",
+    "match": [
+      "SERankingBacklinksBot"
+    ],
+    "cloudflare_slug": "serankingbacklinksbot",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "seranking": {
+    "name": "SERanking",
+    "match": [
+      "SERanking"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "moptimizer": {
+    "name": "mOptimizer",
+    "match": [
+      "mOptimizer"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "screaming-frog": {
+    "name": "Screaming Frog",
+    "match": [
+      "Screaming Frog"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "googlebot": {
+    "name": "Googlebot",
+    "match": [
+      "Googlebot"
+    ],
+    "cloudflare_slug": "google",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "bingbot": {
+    "name": "bingbot",
+    "match": [
+      "bingbot"
+    ],
+    "cloudflare_slug": "bing",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "baiduspider": {
+    "name": "Baiduspider",
+    "match": [
+      "Baiduspider"
+    ],
+    "cloudflare_slug": "baidu",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "yandexbot": {
+    "name": "YandexBot",
+    "match": [
+      "YandexBot"
+    ],
+    "cloudflare_slug": "yandex",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "seznambot": {
+    "name": "SeznamBot",
+    "match": [
+      "SeznamBot"
+    ],
+    "cloudflare_slug": "seznam",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "duckduckbot": {
+    "name": "DuckDuckBot",
+    "match": [
+      "DuckDuckBot"
+    ],
+    "cloudflare_slug": "duckduckbot",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "sogou-spider": {
+    "name": "Sogou Spider",
+    "match": [
+      "Sogou Spider"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "builtwith": {
+    "name": "BuiltWith",
+    "match": [
+      "BuiltWith"
+    ],
+    "cloudflare_slug": "builtwith",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "dataprovider": {
+    "name": "Dataprovider",
+    "match": [
+      "Dataprovider"
+    ],
+    "cloudflare_slug": "dataprovider-com",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "heritrix": {
+    "name": "Heritrix",
+    "match": [
+      "Heritrix"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "censysinspect": {
+    "name": "CensysInspect",
+    "match": [
+      "CensysInspect"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "internetmeasurement": {
+    "name": "InternetMeasurement",
+    "match": [
+      "InternetMeasurement"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "ibou-search": {
+    "name": "ibou-search",
+    "match": [
+      "ibou-search"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "iboubot": {
+    "name": "IbouBot",
+    "match": [
+      "IbouBot"
+    ],
+    "cloudflare_slug": "iboubot-3",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "barkrowler": {
+    "name": "Barkrowler",
+    "match": [
+      "Barkrowler"
+    ],
+    "cloudflare_slug": "babbar-barkrowler",
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "geedoshopproductfinder": {
+    "name": "GeedoShopProductFinder",
+    "match": [
+      "GeedoShopProductFinder"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "exasearchbot": {
+    "name": "ExaSearchBot",
+    "match": [
+      "ExaSearchBot"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "riverbot": {
+    "name": "RiverBot",
+    "match": [
+      "RiverBot"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "pandalytics": {
+    "name": "Pandalytics",
+    "match": [
+      "Pandalytics"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  },
+  "anticlonebot": {
+    "name": "AntiCloneBot",
+    "match": [
+      "AntiCloneBot"
+    ],
+    "cloudflare_slug": null,
+    "docs_recorded": false,
+    "claims": {}
+  }
+}
