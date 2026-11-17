@@ -39,6 +39,7 @@
     /* Badge text sits on the tint above, so it needs its own token: plain
        --yellow only clears 3.2:1 against the light-theme tint. */
     --warn-text: #ffd166;
+    --scroll-shadow: rgba(255,255,255,0.12);
   }
 
   [data-theme="light"] {
@@ -62,6 +63,7 @@
     --verdict-warn-bg: rgba(176,122,0,0.1);
     --verdict-warn-border: rgba(176,122,0,0.3);
     --warn-text: #7a5500;
+    --scroll-shadow: rgba(0,0,0,0.14);
   }
 
   :root {
@@ -292,7 +294,17 @@
 
   /* Wide tables scroll inside their own box instead of widening the page.
      Focusable so keyboard users can scroll it with the arrow keys. */
-  .table-scroll { overflow-x: auto; }
+  .table-scroll {
+    overflow-x: auto;
+    /* Edge shadows that show only while there is more table to scroll to:
+       the bg-coloured covers scroll with the content (local) and hide the
+       shadows (scroll) once an edge is reached. */
+    background:
+      linear-gradient(to right, var(--bg) 30%, transparent) left / 2.5rem 100% no-repeat local,
+      linear-gradient(to left, var(--bg) 30%, transparent) right / 2.5rem 100% no-repeat local,
+      radial-gradient(farthest-side at 0 50%, var(--scroll-shadow), transparent) left / 0.9rem 100% no-repeat scroll,
+      radial-gradient(farthest-side at 100% 50%, var(--scroll-shadow), transparent) right / 0.9rem 100% no-repeat scroll;
+  }
   .table-scroll:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 
   th {
@@ -311,6 +323,10 @@
     border-bottom: 1px solid var(--row-border);
     vertical-align: middle;
   }
+
+  /* Cells have no side padding of their own; without this gap a table at its
+     min width (the 13-column discovery table) runs its headers together. */
+  th + th, td + td { padding-left: 1rem; }
 
   tr:last-child td { border-bottom: none; }
 
@@ -641,11 +657,42 @@
     /* Logo, theme toggle and status need ~300px; below that, wrap instead of overflow. */
     header { flex-wrap: wrap; gap: 0.75rem 1rem; }
     .header-right { gap: 1rem; }
-    /* Cells have no side padding; on desktop width:100% spreads the columns,
-       but a table squeezed to its min width here would run them together. */
-    th + th, td + td { padding-left: 1rem; }
     /* Keep names and verdict badges on one line; the table scrolls instead. */
     .bot-name, .verdict { white-space: nowrap; }
+  }
+
+  /* Phone width: the scoreboard's seven columns cannot fit, and scrolling hid
+     the verdict and every count. Each row becomes a card instead, with the
+     count labels moved from the (visually hidden) header into the cells. */
+  @media (max-width: 600px) {
+    .scoreboard thead {
+      position: absolute; width: 1px; height: 1px; overflow: hidden;
+      clip: rect(0, 0, 0, 0); white-space: nowrap;
+    }
+    .scoreboard tbody tr {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-areas: "name name verdict verdict" "operator operator operator operator";
+      gap: 0.35rem 0.75rem;
+      padding: 0.9rem 0;
+      border-bottom: 1px solid var(--row-border);
+    }
+    .scoreboard td { display: block; padding: 0; border-bottom: none; text-align: left; }
+    .scoreboard td:nth-child(1) { grid-area: name; }
+    .scoreboard td:nth-child(2) { grid-area: operator; }
+    .scoreboard td:nth-child(3) { grid-area: verdict; justify-self: end; }
+    .scoreboard td[data-label] { padding-top: 0.35rem; }
+    .scoreboard td[data-label]::after {
+      content: attr(data-label);
+      display: block;
+      font-family: var(--mono);
+      font-size: 0.6rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+    .scoreboard .empty-state { grid-column: 1 / -1; }
+    .scoreboard .bot-name { white-space: normal; overflow-wrap: anywhere; }
   }
 </style>
 </head>
@@ -705,7 +752,7 @@
   <div class="panel">
     <h2 class="panel-title" id="scoreboard-title">Bot Compliance Scoreboard</h2>
     <div class="table-scroll" tabindex="0" role="region" aria-labelledby="scoreboard-title">
-      <table aria-labelledby="scoreboard-title">
+      <table class="scoreboard" aria-labelledby="scoreboard-title">
         <thead>
           <tr>
             <th scope="col">Bot</th>
@@ -997,16 +1044,16 @@ function renderStats(data) {
       const verified = Number(row.verified_visits) || 0;
       const total = Number(row.total_visits) || 0;
       const signedCell = verified > 0
-        ? `<td class="signed-cell has-verified">${verified}/${total}</td>`
-        : `<td class="signed-cell">—</td>`;
+        ? `<td class="signed-cell has-verified" data-label="Signed">${verified}/${total}</td>`
+        : `<td class="signed-cell" data-label="Signed">—</td>`;
       return `<tr>
         <td><span class="bot-name">${esc(row.bot_name)}</span></td>
         <td><span class="operator">${esc(row.operator)}</span></td>
         <td>${verdict}</td>
         ${signedCell}
-        <td class="count ${isBad ? 'nonzero' : ''}">${row.violations}</td>
-        <td class="count">${Number(row.spoofed_hits) || '—'}</td>
-        <td class="count">${total}</td>
+        <td class="count ${isBad ? 'nonzero' : ''}" data-label="Violations">${row.violations}</td>
+        <td class="count" data-label="Spoofed">${Number(row.spoofed_hits) || '—'}</td>
+        <td class="count" data-label="Visits">${total}</td>
       </tr>`;
     }).join('');
   }
