@@ -1,0 +1,58 @@
+# Bot catalog — implementation rulings
+
+Ledger kept during the build of /bots (plan: docs/superpowers/plans/2026-11-17-bot-catalog.md). Every `Ruling:` line is a decision taken during implementation, with what it costs if wrong. Kept for the blog post and for whoever changes the catalog next.
+
+- Setup: branch feat/bot-catalog off main 77194d9 (no worktree). Ruling: work in a branch of the main checkout instead of a separate worktree — the user's local docker stack and .venv live here and Task 6 needs both — cost if wrong: a stray uncommitted file could leak between branches; mitigated by clean status at start.
+- Scope: Tasks 1–6 now; Task 7 (content) and Task 8 (deploy) deferred until after the 2026-11-19 signature check, per user.
+- Pre-flight:
+- - T2 produces load_claims(path, cf_slugs)->dict[str,BotClaims] keyed by match names; T4 consumes claims: dict[str,BotClaims] — consistent.
+- - T3 produces Measurements keyed by name (AI bot_name or classify_ua name); T2 BotClaims.match uses the same names; T1 adds crawler names — consistent if match names equal classify_ua display names.
+- - T4 consumes derived_claims(name, cf_entry, top_user_agent) from T2 and Measurements.top_user_agent from T3 — consistent.
+- - T5 consumes CatalogEntry/CatalogSummary from T4 — consistent.
+- - T6 consumes discovery path constants from main.py and passes them into fetch_measurements(cur, discovery_paths, discovery_prefixes) — consistent; main imports catalog, catalog must not import main (circular).
+- Task 1: Ruling: plan named 5 signers; production shows 8 unnamed signers (ibou-search@ibou.com and IbouBot@ibou.io are distinct UAs; also Pandalytics, AntiCloneBot) — added all 8 so the signing question is complete — cost if wrong: two extra crawler rows in the discovery table.
+- Task 1: Ruling: test_ua_classification checked class only; added SIGNER_CASES checking (class, name) because the catalog keys on the display name — cost if wrong: none.
+- Task 1: Finding: the 4 verifications since f9873f9 are Barkrowler (4 verified/13 failed), not Ahrefs/ibou; AhrefsBot's last signed request was 2026-11-17 04:19 UTC, before the fix.
+- Task 1: complete (commits 77194d9..41d7bf4, tests: .venv/bin/python test_ua_classification.py → 49/49 passed)
+- Task 2: Ruling: stubs cover all 23 observed AI bots plus every NON_AI_CRAWLERS name (51), not only observed crawlers — unobserved ones are dropped at build time anyway, and it saves a prod query — cost if wrong: a longer claims file.
+- Task 2: Ruling: cloudflare_slug set only for exact name/pattern matches; SemrushBot → semrush-bl (the "~bl" UA). ClaudeBot, PerplexityBot, CCBot, cohere-ai, DeepSeekBot, Google-Extended, Bytespider have no entry in our CF copy → null — cost if wrong: a missing CF operator line, fixable in Task 7.
+- Task 2: Ruling: derived UA claim goes under docs_opt_out with value "info URL in the user agent" — the spec puts info/docs URLs under question 5 — cost if wrong: wording.
+- Task 2: complete (commits 41d7bf4..0f1d4e7, tests: .venv/bin/python test_catalog.py → 23/23 passed)
+- Task 3: Ruling: robots_read_before_first_hit compares against the earliest honeypot hit per name, including a hit later found to be spoofed — the per-UA aggregate does not carry ids — cost if wrong: a bot whose only early hit was spoofed could show "robots.txt read: no" one hit too early; rare.
+- Task 3: Verified fetch_measurements against local MySQL 8.4 in the web container (pymysql % escaping, LIKE prefixes, HEAD exclusion).
+- Task 3: complete (commits 0f1d4e7..411db24, tests: .venv/bin/python test_catalog.py → 40/40 passed)
+- Task 4: complete (commits 411db24..1b72825, tests: .venv/bin/python test_catalog.py → 52/52 passed)
+- Task 5: Ruling: list layout (h2 per bot, h3 per question, ul of claims) instead of a table — reuses blog.css .article styles and stays readable at phone width without new CSS — cost if wrong: a longer page; a compact table view can follow.
+- Task 5: Ruling: Cloudflare-derived values (operator name) are rendered raw in Markdown, unlike UA text — third-party data, not attacker-chosen per request — cost if wrong: odd Markdown if a CF operator name contains markup.
+- Task 5: complete (commits 1b72825..d23a4c7, tests: .venv/bin/python test_catalog.py → 66/66 passed)
+- Task 6: Ruling: route tests in a new test_catalog_route.py (mirrors test_mcp_route.py) instead of test_catalog.py — keeps the pure tests free of the app import — cost if wrong: none.
+- Task 6: Ruling: footer link added to both templates/index.html and templates/blog_base.html; small catalog CSS in vendor/css/blog.css (.contradicted red, .source muted, code wraps) — cost if wrong: none.
+- Task 6: Finding (for the user): the list layout makes the page long — 9 local bots ≈ 7,900 px at 1440 px; ~40 production bots would be far longer. Not a spec violation; flagged for a layout decision.
+- Task 6: Verified locally at 390 px and 1440 px, light and dark: no horizontal scroll, UA URLs not links; tests pass inside the built image (66/66, 11/11, 49/49).
+- Task 6: complete (commits d23a4c7..8589980, tests: .venv/bin/python test_catalog_route.py → 11/11 passed)
+- User request (after Task 6): Ruling: replaced per-bot sections with one table (user asked "Bitte als Tabelle"); recognition/operator/docs share an "Other claims" column to keep 8 columns — cost if wrong: a crowded last column once Task 7 records many claims. Verified 1440 light / 390 dark; tests 71/71, full suite green.
+- Final review: opus reviewer on 77194d9..8589980 (384c269 table layout landed during review, unreviewed by it).
+- Final: fixed Important #1 Cloudflare URLs linked without scheme check — "javascript: URL is not a link" et al. RED→GREEN, suite green.
+- Final: fixed Important #2 only honeypot hits were spoof-filtered (spec says spoofed visits are excluded) — "spoofed visits are excluded from every AI measurement" RED→GREEN; spoof exclusion moved into SQL (id NOT IN), combine_measurements no longer subtracts.
+- Final: fixed Important #3 crawler LIMIT could starve named crawlers — "crawler query is narrowed to named crawler patterns" RED→GREEN.
+- Final: fixed Minor #8 re-graded Important (a late-evening claims edit could stop the app starting) — "claims are dated against UTC" RED→GREEN. Minor #10 (no SQL test) covered by the recording-cursor test; Minor #5 (negative hit count race) gone with the SQL exclusion.
+- Final: Ruling: a bot whose visits are all spoofed no longer appears in the catalog — follows the spec's "spoofed visits are excluded"; the scoreboard still lists it — cost if wrong: catalog and scoreboard bot counts differ.
+- Final: Ruling: no /bots.md alias (reviewer Minor #7) — /facts uses Accept negotiation and the spec asks for "the same three-format pattern as the grounding pages" — cost if wrong: an agent requesting /bots.md gets 404.
+- Final: minor (deferred): rows logged before a bot entered KNOWN_BOTS classify as AI and are dropped from crawler aggregation (same as scoreboard).
+- Final: minor (deferred): PetalBot is in both KNOWN_BOTS (via CF) and NON_AI_CRAWLERS; add a disjointness test and drop the dead entry.
+- Final: minor (deferred): operator shown is whichever named row comes first if a bot_name had two operator strings.
+- Final: minor (deferred): catalog discovery reads omit /.well-known/mcp-server and add /bots, /api/bots, so they differ from the dashboard's Discovery Reads row.
+- Final: minor (deferred): facts._page's sequential .replace() rewrites __TITLE__/__HEAD_EXTRA__ inside UA text (harmless, head_extra empty).
+- Final: minor (deferred): validate_claims crashes instead of reporting when a question's value is not a list.
+- Final: self-check of 384c269 (table layout, not reviewer-covered): escaping paths unchanged (_claim_html/_md_code reused), pipes escaped in Markdown cells (test), one row per bot (test); verified in browser at 1440 light / 390 dark.
+- Task 7: Ruling: Radar bot pages (radar.cloudflare.com/bots/directory/<slug>) checked via the SSR HTML in a real browser (curl/WebFetch get 403); 28 of 29 carry no robots.txt statement → recorded "no-statement"; Amazonbot "obeys" from its operator-supplied description shown on Radar — cost if wrong: Radar may show it in a UI element not in SSR HTML; spot-checked GPTBot and AhrefsBot rendered pages, no robots text.
+- Task 7: Ruling: "obeys" only where the docs say so explicitly; robots.txt mentioned only as a way to block → "no-statement" with the quote in the note — cost if wrong: a few bots look less committed than their operators intend.
+- Task 7: Ruling: signing recorded as "not stated" where docs are silent (that silence is the finding, esp. AhrefsBot/Barkrowler which do sign) — cost if wrong: none.
+- Task 7: Ruling: DeepSeekBot and ChatGLM-Spider docs_recorded=true with no claims (searched, no first-party docs); Bytespider left "not yet recorded" (official zhanzhang.toutiao.com page not verifiable) — cost if wrong: a missed official page.
+- Task 7: Caveat: operator-docs quotes were extracted via WebFetch's summarising model (PetalBot via browser); user asked to spot-check before deploy.
+- Task 7: complete-for-now (af99fab): 24 bots docs_recorded, 29 Radar claims; non-AI crawlers other than Ahrefs/Barkrowler not recorded (outside the ~25 scope).
+- Task 7 (rest, user request): 3 lookup agents (first-party only, verbatim quotes) for 27 remaining crawlers; merged via scratchpad merge.py. Spot-verified at source: MJ12bot, Dataprovider, BuiltWith (WebFetch), Geedo, SERankingBacklinksBot and Bing (own browser, after an agent reported cross-talk in the shared Playwright browser).
+- Task 7: Ruling: Sogou "支持 robots 协议" (supports) recorded as no-statement, not obeys — strict rule — cost if wrong: Sogou looks less committed.
+- Task 7: Ruling: Yandex "Takes into account the General rules specified in robots.txt: Yes" and DuckDuckBot "respects robotstxt.org" kept as obeys — cost if wrong: two bots look more committed than their wording.
+- Task 7: Ruling: mOptimizer and generic SERanking token: docs_recorded=true with no claims (no first-party page exists) — cost if wrong: none.
+- Post-deploy: fixed verified-before-cutoff (Geedo shown as 'signed before fix') — 'verified counts at any time' RED→GREEN, suite green. JSON field signed_before_fix now holds failures before the cutoff only (name kept for API stability).
