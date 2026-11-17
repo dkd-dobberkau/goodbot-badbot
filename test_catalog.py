@@ -195,6 +195,53 @@ def main() -> int:
     check("crawler failed signatures sum", measured["AhrefsBot"].signed_failed, 3)
     check("empty inputs", catalog.combine_measurements([], [], []), {})
 
+    # ── build_catalog ───────────────────────────────────────────────────────
+    def m(name, bot_class="ai", visits=5, hits=0, **kw):
+        return catalog.Measurements(name, bot_class, kw.pop("operator", "Op"), visits=visits,
+                                    honeypot_hits=hits, spoof_filtered=bot_class == "ai",
+                                    top_user_agent=kw.pop("ua", None), **kw)
+
+    obeys = lambda source: catalog.Claim("robots_txt", "obeys", source,  # noqa: E731
+                                         "https://example.test/docs", "2026-11-20")
+    claims = {
+        "GPTBot": catalog.BotClaims("gptbot", "GPTBot", ("GPTBot",), "gptbot", True,
+                                    (obeys("operator-docs"), obeys("cloudflare"))),
+        "ClaudeBot": catalog.BotClaims("claudebot", "ClaudeBot", ("ClaudeBot",), None, True,
+                                       (obeys("operator-docs"),)),
+        "AhrefsBot": catalog.BotClaims("ahrefsbot", "AhrefsBot", ("AhrefsBot",), None, True,
+                                       (obeys("operator-docs"),)),
+        "NeverSeen": catalog.BotClaims("neverseen", "NeverSeen", ("NeverSeen",), None, True, ()),
+    }
+    cf_by_slug = {"gptbot": cf_entry}
+    measurements = {
+        "GPTBot": m("GPTBot", visits=124, hits=3, ua=gpt_a),
+        "ClaudeBot": m("ClaudeBot", visits=1438),
+        "AhrefsBot": m("AhrefsBot", bot_class="crawler", visits=40, hits=5),
+        "PetalBot": m("PetalBot", visits=147, hits=6),
+    }
+    entries, summary = catalog.build_catalog(claims, cf_by_slug, measurements)
+    by_name = {e.name: e for e in entries}
+
+    check("measured bot without a claims entry appears", "PetalBot" in by_name, True)
+    check("…as not yet recorded", by_name["PetalBot"].docs_recorded, False)
+    check("claims entry without visits is dropped", "NeverSeen" in by_name, False)
+    gpt_robots = [c for c in by_name["GPTBot"].claims if c.claim.question == "robots_txt"]
+    check("both sources contradicted", [c.contradicted for c in gpt_robots], [True, True])
+    check("reason carries the count", {c.reason for c in gpt_robots}, {"3 honeypot hits"})
+    check("no hits → not contradicted",
+          [c.contradicted for c in by_name["ClaudeBot"].claims], [False])
+    check("crawler with hits is never contradicted",
+          [c.contradicted for c in by_name["AhrefsBot"].claims], [False])
+    check("user-agent claims are never links",
+          [c.is_link for c in by_name["GPTBot"].claims if c.claim.source == "user-agent"], [False])
+    check("other claims with a URL are links",
+          all(c.is_link for c in by_name["GPTBot"].claims if c.claim.source == "operator-docs"), True)
+    check("order: hits desc, then visits desc",
+          [e.name for e in entries], ["PetalBot", "AhrefsBot", "GPTBot", "ClaudeBot"])
+    check("summary", summary, catalog.CatalogSummary(bots=4, docs_recorded=3, with_contradiction=1))
+    check("1 hit is singular", catalog.build_catalog(
+        claims, {}, {"GPTBot": m("GPTBot", hits=1)})[0][0].claims[0].reason, "1 honeypot hit")
+
     print(f"\n{total - failures}/{total} passed")
     return 0 if failures == 0 else 1
 

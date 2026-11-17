@@ -271,3 +271,68 @@ async def fetch_measurements(cur, discovery_paths: tuple[str, ...],
     )
     crawler_ua_rows = await cur.fetchall()
     return combine_measurements(list(named_rows), list(named_visits), list(crawler_ua_rows))
+
+
+@dataclass(frozen=True)
+class ShownClaim:
+    claim: Claim
+    is_link: bool
+    contradicted: bool
+    reason: str
+
+
+@dataclass
+class CatalogEntry:
+    name: str
+    operator: str
+    bot_class: str
+    docs_recorded: bool
+    claims: list[ShownClaim]
+    measurements: Measurements
+
+
+@dataclass(frozen=True)
+class CatalogSummary:
+    bots: int
+    docs_recorded: int
+    with_contradiction: int
+
+
+def _contradiction(claim: Claim, measured: Measurements) -> str:
+    """The reason a claim is contradicted, or "" when it is not.
+
+    Deliberately one rule. Only spoof-filtered (AI) bots qualify, and signing
+    has no rule: anyone borrowing a name sends unsigned requests, and a failed
+    signature may be our verifier's fault."""
+    if (claim.question == "robots_txt" and claim.value == "obeys"
+            and measured.bot_class == CLASS_AI and measured.honeypot_hits >= 1):
+        hits = measured.honeypot_hits
+        return f"{hits} honeypot hit{'s' if hits != 1 else ''}"
+    return ""
+
+
+def build_catalog(claims: dict[str, BotClaims], cf_by_slug: dict[str, dict],
+                  measurements: dict[str, Measurements]) -> tuple[list[CatalogEntry], CatalogSummary]:
+    """One entry per measured bot, stored claims first, then derived ones."""
+    entries = []
+    for name, measured in measurements.items():
+        if measured.visits < 1:
+            continue
+        stored = claims.get(name)
+        cf_entry = cf_by_slug.get(stored.cloudflare_slug) if stored and stored.cloudflare_slug else None
+        all_claims = [*(stored.claims if stored else ()),
+                      *derived_claims(name, cf_entry, measured.top_user_agent)]
+        shown = []
+        for claim in all_claims:
+            reason = _contradiction(claim, measured)
+            shown.append(ShownClaim(claim, is_link=bool(claim.url) and claim.source != "user-agent",
+                                    contradicted=bool(reason), reason=reason))
+        entries.append(CatalogEntry(name, measured.operator, measured.bot_class,
+                                    bool(stored and stored.docs_recorded), shown, measured))
+    entries.sort(key=lambda e: (-e.measurements.honeypot_hits, -e.measurements.visits))
+    summary = CatalogSummary(
+        bots=len(entries),
+        docs_recorded=sum(e.docs_recorded for e in entries),
+        with_contradiction=sum(any(c.contradicted for c in e.claims) for e in entries),
+    )
+    return entries, summary
