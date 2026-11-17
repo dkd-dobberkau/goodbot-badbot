@@ -13,6 +13,7 @@ import time
 from collections import defaultdict, deque
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
 from urllib.parse import urlsplit
 
 import aiomysql
@@ -28,7 +29,7 @@ from http_message_signatures import (
     algorithms,
 )
 
-from app import blog, facts, legal, mcp, spoofing
+from app import blog, catalog, facts, legal, mcp, spoofing
 
 # The UA taxonomy lives in app.bots. identify_bot and KNOWN_BOTS are re-exported
 # here because both are part of this module's established import surface.
@@ -62,6 +63,8 @@ RATE_LIMIT_RULES = (
     ("/blog",                   60),
     ("/feed.xml",               60),
     ("/facts",                  60),
+    ("/bots",                   60),
+    ("/api/bots",               60),
     ("/AGENTS.md",              60),
     ("/agents.md",              60),
     ("/.well-known/agents.md",  60),
@@ -666,6 +669,9 @@ def _build_sitemap() -> str:
     urls.append(
         f"  <url>\n    <loc>{SITE_BASE_URL}/facts</loc>\n    <lastmod>{SITEMAP_LASTMOD}</lastmod>\n  </url>"
     )
+    urls.append(
+        f"  <url>\n    <loc>{SITE_BASE_URL}/bots</loc>\n    <lastmod>{SITEMAP_LASTMOD}</lastmod>\n  </url>"
+    )
     for fact in facts.list_facts():
         lastmod = fact.date_modified or SITEMAP_LASTMOD
         urls.append(
@@ -1072,6 +1078,7 @@ Factual, machine-readable entity definitions for AI systems to cite:
 
 - [goodbot-badbot](https://goodbot-badbot.com/facts/goodbot-badbot): the experiment as a dataset
 - [robots.txt compliance](https://goodbot-badbot.com/facts/robots-txt-compliance): the measured concept
+- [Bot catalog](https://goodbot-badbot.com/bots): every claim about each bot we have seen, with its source, next to what it did here
 
 ## Honeypot paths
 
@@ -1289,6 +1296,73 @@ async def facts_page(request: Request, slug: str):
     if _wants_markdown(request.headers.get("accept", "")):
         return Response(content=fact.md, media_type="text/markdown; charset=utf-8")
     return HTMLResponse(content=facts.render_fact_html(fact))
+
+
+# The bot catalog (see app/catalog.py) is read like a grounding page, so reads
+# are logged too: it measures whether agents read what is said about them.
+# Claims load at import, so an invalid bot_claims.json stops the app starting.
+_CF_BOTS = json.loads((Path(__file__).parent / "cf_bots.json").read_text(encoding="utf-8"))
+_CF_BY_SLUG = {bot["slug"]: bot for bot in _CF_BOTS}
+CATALOG_CLAIMS = catalog.load_claims(Path(__file__).parent / "bot_claims.json", set(_CF_BY_SLUG))
+CATALOG_DISCOVERY_PATHS = (
+    *DISCOVERY_PATHS, *API_CATALOG_PATHS, *ARD_CATALOG_PATHS, *MCP_PATHS,
+    "/facts", "/bots", "/api/bots",
+)
+CATALOG_DISCOVERY_PREFIXES = ("/facts/",)
+# Longer than the stats cache: the catalog is several aggregate queries and
+# nobody polls it.
+CATALOG_TTL_S = 60
+_catalog_cache: dict = {"ts": 0.0, "data": None}
+_catalog_lock = asyncio.Lock()
+
+
+async def _compute_catalog():
+    async with app.state.db_pool.acquire() as conn:
+        async with conn.cursor(aiomysql.DictCursor) as cur:
+            measured = await catalog.fetch_measurements(
+                cur, CATALOG_DISCOVERY_PATHS, CATALOG_DISCOVERY_PREFIXES)
+    return catalog.build_catalog(CATALOG_CLAIMS, _CF_BY_SLUG, measured)
+
+
+async def _get_catalog_cached():
+    now = time.monotonic()
+    if _catalog_cache["data"] is not None and (now - _catalog_cache["ts"]) < CATALOG_TTL_S:
+        return _catalog_cache["data"]
+    async with _catalog_lock:
+        now = time.monotonic()
+        if _catalog_cache["data"] is not None and (now - _catalog_cache["ts"]) < CATALOG_TTL_S:
+            return _catalog_cache["data"]
+        data = await _compute_catalog()
+        _catalog_cache["ts"] = time.monotonic()
+        _catalog_cache["data"] = data
+        return data
+
+
+async def _log_catalog_read(request: Request, path: str) -> None:
+    ua = request.headers.get("user-agent", "")
+    if _should_log_meta_visit(path, ua, request.method):
+        await log_visit(
+            app.state.db_pool, path, ua, request.client.host, is_honeypot=False,
+            signature_status=request.state.signature_status,
+            method=request.method,
+        )
+
+
+@app.get("/bots")
+async def bots_catalog(request: Request):
+    await _log_catalog_read(request, "/bots")
+    entries, summary = await _get_catalog_cached()
+    if _wants_markdown(request.headers.get("accept", "")):
+        return Response(content=catalog.render_markdown(entries, summary),
+                        media_type="text/markdown; charset=utf-8")
+    return HTMLResponse(content=catalog.render_html(entries, summary))
+
+
+@app.get("/api/bots")
+async def bots_catalog_api(request: Request, response: Response):
+    await _log_catalog_read(request, "/api/bots")
+    response.headers["Cache-Control"] = f"public, max-age={CATALOG_TTL_S}"
+    return catalog.to_json(*await _get_catalog_cached())
 
 
 # ── Honeypot endpoints ───────────────────────────────────────────────────────

@@ -225,6 +225,11 @@ header {
 }
 
 .article strong { color: var(--text); font-weight: 600; }
+/* Bot catalog: a claim our measurements contradict, and where a claim came from. */
+.article .contradicted { color: var(--red); }
+.article .source { color: var(--muted); }
+/* Long user agents and URLs must wrap, not widen the page on a phone. */
+.article code { overflow-wrap: anywhere; }
 
 /* POST INDEX */
 .post-list { list-style: none; margin: 0; padding: 0; }
