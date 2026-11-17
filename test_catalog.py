@@ -209,6 +209,9 @@ def main() -> int:
 
     cur = RecordingCursor([named_visits, named_rows, crawler_rows])
     asyncio.run(catalog.fetch_measurements(cur, ("/llms.txt",), ("/facts/",)))
+    check("verified counts at any time; only failures before the fix are set aside",
+          ("signature_status = 'verified' AND ts >=" not in cur.queries[1][0]
+           and "signature_status = 'failed' AND ts < %s" in cur.queries[1][0]), True)
     check("every query has as many %s as parameters",
           [sql.count("%s") == len(params) for sql, params in cur.queries], [True, True, True])
     named_sql, named_params = cur.queries[1]
@@ -304,7 +307,7 @@ def main() -> int:
     check("html: contradiction shown", "contradicted: 3 honeypot hits" in html_out, True)
     check("markdown: contradiction shown", "contradicted: 3 honeypot hits" in md_out, True)
     youbot_html = html_out.split("YouBot")[1]
-    check("signed before the fix is labelled", "signed before our verifier fix" in youbot_html, True)
+    check("failures before the fix are labelled", "failed before our verifier fix" in youbot_html, True)
     check("…and never as verified", "verified" in youbot_html.replace("verifier", ""), False)
     check("empty catalog says so",
           "No bots observed yet" in catalog.render_html([], catalog.CatalogSummary(0, 0, 0)), True)

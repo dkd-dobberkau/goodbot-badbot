@@ -26,8 +26,10 @@ ROBOTS_VALUES = ("obeys", "does-not-obey", "no-statement")
 # Only these may be stored; the other two sources are derived.
 STORED_SOURCES = ("operator-docs", "cloudflare")
 
-# Signed rows before this moment failed because of our verifier, not the bot:
-# every signature failed until 66e5b56, and bare-origin Signature-Agent values
+# Failed signatures before this moment failed because of our verifier, not the
+# bot, so they are set aside. A verified signature is never our fault and
+# counts whenever it happened (GeedoShopProductFinder, 2026-11-06).
+# Every signature failed until 66e5b56, and bare-origin Signature-Agent values
 # until f9873f9 (image pushed 2026-11-17 09:24:34 UTC). Naive UTC.
 SIGNING_COUNT_SINCE = datetime(2026, 11, 17, 9, 30)
 # Mirrors main.DISCOVERY_UA_GROUP_LIMIT: a UA-randomising crawler must not turn
@@ -247,14 +249,14 @@ def _aggregate_columns(discovery_paths: tuple[str, ...], discovery_prefixes: tup
         CAST(SUM(is_honeypot) AS UNSIGNED) AS honeypot,
         CAST(SUM((path IN ({path_ph}){prefix_sql}) AND COALESCE(method, 'GET') <> 'HEAD')
              AS UNSIGNED) AS discovery,
-        CAST(SUM(signature_status = 'verified' AND ts >= %s) AS UNSIGNED) AS verified_since,
+        CAST(SUM(signature_status = 'verified') AS UNSIGNED) AS verified_since,
         CAST(SUM(signature_status = 'failed' AND ts >= %s) AS UNSIGNED) AS failed_since,
-        CAST(SUM(signature_status IS NOT NULL AND ts < %s) AS UNSIGNED) AS signed_before,
+        CAST(SUM(signature_status = 'failed' AND ts < %s) AS UNSIGNED) AS signed_before,
         MIN(CASE WHEN is_honeypot = 1 THEN ts END) AS first_honeypot_ts,
         MIN(CASE WHEN path = '/robots.txt' THEN ts END) AS first_robots_ts
     """
     params = (*discovery_paths, *(p + "%" for p in discovery_prefixes),
-              SIGNING_COUNT_SINCE, SIGNING_COUNT_SINCE, SIGNING_COUNT_SINCE)
+              SIGNING_COUNT_SINCE, SIGNING_COUNT_SINCE)
     return columns, params
 
 
@@ -416,10 +418,12 @@ def _robots_first_text(m: Measurements) -> str:
 
 def _signing_text(m: Measurements) -> str:
     parts = []
-    if m.signed_verified or m.signed_failed:
-        parts.append(f"{m.signed_verified} verified, {m.signed_failed} failed since {_SINCE_LABEL}")
+    if m.signed_verified:
+        parts.append(f"{m.signed_verified} verified")
+    if m.signed_failed:
+        parts.append(f"{m.signed_failed} failed since {_SINCE_LABEL}")
     if m.signed_before_fix:
-        parts.append(f"{m.signed_before_fix} signed before our verifier fix")
+        parts.append(f"{m.signed_before_fix} failed before our verifier fix")
     return "; ".join(parts) or "none"
 
 
