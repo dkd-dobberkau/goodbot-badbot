@@ -171,6 +171,17 @@ NON_AI_CRAWLERS = {
     "heritrix":                  ("Heritrix",                "various"),
     "censysinspect":             ("CensysInspect",           "Censys"),
     "internetmeasurement":       ("InternetMeasurement",     "Driftnet"),
+    # Signers: self-declared crawlers seen sending Web Bot Auth signatures.
+    # Named so the bot catalog can show them; operators are taken from the
+    # UA's own info URL (IbouBot's from Cloudflare's directory).
+    "ibou-search":               ("ibou-search",             "ibou.com"),
+    "iboubot":                   ("IbouBot",                 "Babbar"),
+    "barkrowler":                ("Barkrowler",              "Babbar"),
+    "geedoshopproductfinder":    ("GeedoShopProductFinder",  "unknown"),
+    "exasearchbot":              ("ExaSearchBot",            "Exa"),
+    "riverbot":                  ("RiverBot",                "river.ai"),
+    "pandalytics":               ("Pandalytics",             "DomainsBot"),
+    "anticlonebot":              ("AntiCloneBot",            "anticlone.de"),
 }
 
 # Generic HTTP client libraries. A scripted client is the most interesting

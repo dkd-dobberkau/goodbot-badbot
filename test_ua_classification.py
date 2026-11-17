@@ -78,6 +78,22 @@ def _row(user_agent, *, llms=0, facts=0, mcp=0, probes=0, last_seen="2026-08-20"
     }
 
 
+# Crawlers seen sending Web Bot Auth signatures (production, 2026-11-17).
+# UAs verbatim; the catalog keys on the display name, so it is checked too.
+SIGNER_CASES = [
+    ("Mozilla/5.0 (compatible; ibou-search/2.0; +https://ibou.com/crawlers.html)", "ibou-search"),
+    ("Mozilla/5.0 (compatible; IbouBot/1.0; +bot@ibou.io; +https://ibou.io/iboubot.html)", "IbouBot"),
+    ("Mozilla/5.0 (compatible; Barkrowler/0.9; +https://babbar.tech/crawler)", "Barkrowler"),
+    ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko; GeedoShopProductFinder) "
+     "Chrome/142.0.0.0 Safari/537.36", "GeedoShopProductFinder"),
+    ("Mozilla/5.0 (compatible; ExaSearchBot/1.0; +https://crawler.exa.ai/)", "ExaSearchBot"),
+    ("RiverBot/1.0 (+https://river.ai/bot)", "RiverBot"),
+    ("Pandalytics/2.0 (+https://domainsbot.com/network-crawler-pandalytics-kdc68dhsbd/)", "Pandalytics"),
+    ("Mozilla/5.0 (compatible; AntiCloneBot/0.1; +finds copies of online shops for their owners; "
+     "no login, no orders; contact: support@anticlone.de) radar; +https://anticlone.de/bot", "AntiCloneBot"),
+]
+
+
 def check(label, got, want, failures):
     ok = got == want
     print(f"{'PASS' if ok else 'FAIL'} {label}: got {got!r}, want {want!r}")
@@ -90,6 +106,10 @@ def main() -> int:
     for ua, want_class, label in CLASSIFY_CASES:
         got_class, _, _ = classify_ua(ua)
         failures = check(f"classify {label}", got_class, want_class, failures)
+
+    for ua, want_name in SIGNER_CASES:
+        got_class, got_name, _ = classify_ua(ua)
+        failures = check(f"signer {want_name}", (got_class, got_name), (CLASS_CRAWLER, want_name), failures)
 
     failures = check("is_self_tooling(deploy check)",
                      is_self_tooling("goodbot-badbot-deploy-check/1.0"), True, failures)
