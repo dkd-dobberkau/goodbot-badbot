@@ -242,6 +242,33 @@ def main() -> int:
     check("1 hit is singular", catalog.build_catalog(
         claims, {}, {"GPTBot": m("GPTBot", hits=1)})[0][0].claims[0].reason, "1 honeypot hit")
 
+    # ── render_html / render_markdown / to_json ─────────────────────────────
+    evil_ua = "Evil/1.0 (+https://x.test/a)</script><img src=x>`rm`"
+    evil = catalog.build_catalog(
+        claims, cf_by_slug,
+        {"GPTBot": m("GPTBot", visits=124, hits=3, ua=evil_ua),
+         "YouBot": m("YouBot", visits=3, signed_before_fix=2)})
+    html_out = catalog.render_html(*evil)
+    md_out = catalog.render_markdown(*evil)
+    check("html: no raw </script> from the UA", "</script><img" in html_out, False)
+    check("html: the UA is shown escaped", "&lt;/script&gt;&lt;img" in html_out, True)
+    check("html: no img tag from the UA", "<img" in html_out, False)
+    check("html: UA URL is not a link", 'href="https://x.test/a"' in html_out, False)
+    check("markdown: UA URL is not a link", "](https://x.test/a)" in md_out, False)
+    check("markdown: no raw backtick from the UA", "`rm`" in md_out, False)
+    check("html: contradiction shown", "contradicted: 3 honeypot hits" in html_out, True)
+    check("markdown: contradiction shown", "contradicted: 3 honeypot hits" in md_out, True)
+    youbot_html = html_out.split("YouBot")[1]
+    check("signed before the fix is labelled", "signed before our verifier fix" in youbot_html, True)
+    check("…and never as verified", "verified" in youbot_html.replace("verifier", ""), False)
+    check("empty catalog says so",
+          "No bots observed yet" in catalog.render_html([], catalog.CatalogSummary(0, 0, 0)), True)
+    as_json = catalog.to_json(*evil)
+    check("json serialises", isinstance(json.dumps(as_json), str), True)
+    check("json has summary and bots", sorted(as_json), ["bots", "summary"])
+    check("json keeps the contradiction",
+          any(c["contradicted"] for c in as_json["bots"][0]["claims"]), True)
+
     print(f"\n{total - failures}/{total} passed")
     return 0 if failures == 0 else 1
 

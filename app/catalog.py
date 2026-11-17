@@ -9,14 +9,15 @@ Stored claims (app/bot_claims.json) are hand-recorded from operator docs and
 from Cloudflare Radar, each with a URL and a retrieval date. User-Agent and
 the other Cloudflare fields are derived at render time so they cannot drift.
 """
+import html
 import json
 import re
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import date, datetime
 from pathlib import Path
 
-from app import spoofing
+from app import facts, spoofing
 from app.bots import CLASS_AI, CLASS_CRAWLER, classify_ua
 
 QUESTIONS = ("operator", "robots_txt", "recognition", "signing", "docs_opt_out")
@@ -336,3 +337,176 @@ def build_catalog(claims: dict[str, BotClaims], cf_by_slug: dict[str, dict],
         with_contradiction=sum(any(c.contradicted for c in e.claims) for e in entries),
     )
     return entries, summary
+
+
+QUESTION_LABELS = {
+    "operator": "Who runs it",
+    "robots_txt": "Obeys robots.txt?",
+    "recognition": "How to recognise it",
+    "signing": "Signs its requests?",
+    "docs_opt_out": "Docs and opt-out",
+}
+SOURCE_LABELS = {
+    "user-agent": "stated in its user agent",
+    "cloudflare": "Cloudflare",
+    "operator-docs": "operator docs",
+    "signature-directory": "signature directory",
+}
+_SINCE_LABEL = SIGNING_COUNT_SINCE.date().isoformat()
+
+TITLE = "Bot catalog"
+INTRO = (
+    "There is no standard for a bot to describe itself. robots.txt holds the "
+    "site's rules, not the bot's. The info URL in a user agent is a convention "
+    "anyone can forge. Web Bot Auth proves who signed a request, not what the "
+    "bot promises. So what a bot is said to do comes from several places that "
+    "do not agree. This page lists every claim about each bot we have seen, "
+    "where it comes from, and what the bot actually did here. An empty row is "
+    "a finding, not a gap in the page."
+)
+
+
+def _plural(count: int, word: str) -> str:
+    return f"{count} {word}{'' if count == 1 else 's'}"
+
+
+def _summary_line(summary: CatalogSummary) -> str:
+    return (f"{_plural(summary.bots, 'bot')} · {summary.docs_recorded} with operator docs "
+            f"recorded · {summary.with_contradiction} with at least one contradicted claim")
+
+
+def _measurement_lines(entry: CatalogEntry) -> list[str]:
+    """Plain-text measurement lines; callers escape them for their format."""
+    m = entry.measurements
+    hits = _plural(m.honeypot_hits, "honeypot hit")
+    if not m.spoof_filtered:
+        hits += " (not checked for spoofing)"
+    lines = [f"{_plural(m.visits, 'visit')} · {hits} · {_plural(m.discovery_reads, 'discovery read')}"]
+    if m.robots_read_before_first_hit is not None:
+        lines.append("read robots.txt before its first honeypot hit: "
+                     + ("yes" if m.robots_read_before_first_hit else "no"))
+    signing = []
+    if m.signed_verified or m.signed_failed:
+        signing.append(f"{m.signed_verified} verified, {m.signed_failed} failed since {_SINCE_LABEL}")
+    if m.signed_before_fix:
+        signing.append(f"{m.signed_before_fix} signed before our verifier fix")
+    lines.append("signed requests: " + ("; ".join(signing) if signing else "none"))
+    if m.spoofed_by_others:
+        lines.append(f"name borrowed in {_plural(m.spoofed_by_others, 'spoofed visit')}")
+    return lines
+
+
+def _claims_by_question(entry: CatalogEntry) -> dict[str, list[ShownClaim]]:
+    grouped = {question: [] for question in QUESTIONS}
+    for shown in entry.claims:
+        grouped[shown.claim.question].append(shown)
+    return grouped
+
+
+def _claim_html(shown: ShownClaim) -> str:
+    claim = shown.claim
+    source = html.escape(SOURCE_LABELS[claim.source])
+    if claim.retrieved:
+        source += f", {html.escape(claim.retrieved)}"
+    if shown.is_link:
+        url = html.escape(claim.url, quote=True)
+        source = f'<a href="{url}" rel="nofollow noopener">{source}</a>'
+    elif claim.url:
+        source += f": <code>{html.escape(claim.url)}</code>"
+    text = f"{html.escape(claim.value)} <span class=\"source\">({source})</span>"
+    if claim.note:
+        text += f" — {html.escape(claim.note)}"
+    if shown.contradicted:
+        text += f' <strong class="contradicted">contradicted: {html.escape(shown.reason)}</strong>'
+    return f"<li>{text}</li>"
+
+
+def _entry_html(entry: CatalogEntry) -> str:
+    parts = [f"<h2>{html.escape(entry.name)} · {html.escape(entry.operator)}</h2>"]
+    parts += [f'<p class="article-date">{html.escape(line)}</p>' for line in _measurement_lines(entry)]
+    if entry.measurements.top_user_agent:
+        parts.append(f"<p>Most frequent user agent: <code>{html.escape(entry.measurements.top_user_agent)}</code></p>")
+    if not entry.docs_recorded:
+        parts.append("<p><em>Operator docs: not yet recorded.</em></p>")
+    for question, shown in _claims_by_question(entry).items():
+        items = "".join(_claim_html(s) for s in shown) or "<li>no source</li>"
+        parts.append(f"<h3>{html.escape(QUESTION_LABELS[question])}</h3><ul>{items}</ul>")
+    return "".join(parts)
+
+
+def render_html(entries: list[CatalogEntry], summary: CatalogSummary) -> str:
+    if entries:
+        body = "".join(_entry_html(entry) for entry in entries)
+    else:
+        body = '<p class="empty">No bots observed yet.</p>'
+    content = (
+        f'<main class="article" id="main"><h1 class="article-title">{TITLE}</h1>'
+        f"<p>{html.escape(INTRO)}</p>"
+        f'<p class="article-date">{html.escape(_summary_line(summary))}</p>'
+        f"{body}</main>"
+    )
+    return facts._page(TITLE, content)
+
+
+def _md_code(text: str) -> str:
+    """Untrusted text as an inert Markdown code span."""
+    return "`" + text.replace("`", "").replace("\n", " ") + "`"
+
+
+def _claim_markdown(shown: ShownClaim) -> str:
+    claim = shown.claim
+    source = SOURCE_LABELS[claim.source] + (f", {claim.retrieved}" if claim.retrieved else "")
+    if shown.is_link:
+        source = f"[{source}]({claim.url})"
+    elif claim.url:
+        source += f": {_md_code(claim.url)}"
+    line = f"- {claim.value} ({source})"
+    if claim.note:
+        line += f" — {claim.note}"
+    if shown.contradicted:
+        line += f" **contradicted: {shown.reason}**"
+    return line
+
+
+def render_markdown(entries: list[CatalogEntry], summary: CatalogSummary) -> str:
+    lines = [f"# {TITLE}", "", INTRO, "", _summary_line(summary), ""]
+    if not entries:
+        lines.append("No bots observed yet.")
+    for entry in entries:
+        lines += [f"## {entry.name} · {entry.operator}", ""]
+        lines += [f"- {line}" for line in _measurement_lines(entry)]
+        if entry.measurements.top_user_agent:
+            lines.append(f"- most frequent user agent: {_md_code(entry.measurements.top_user_agent)}")
+        if not entry.docs_recorded:
+            lines.append("- operator docs: not yet recorded")
+        lines.append("")
+        for question, shown in _claims_by_question(entry).items():
+            lines += [f"### {QUESTION_LABELS[question]}", ""]
+            lines += [_claim_markdown(s) for s in shown] or ["- no source"]
+            lines.append("")
+    return "\n".join(lines) + "\n"
+
+
+def _public_measurements(m: Measurements) -> dict:
+    return {k: v for k, v in asdict(m).items() if not k.startswith("_")}
+
+
+def to_json(entries: list[CatalogEntry], summary: CatalogSummary) -> dict:
+    return {
+        "summary": asdict(summary),
+        "bots": [
+            {
+                "name": e.name,
+                "operator": e.operator,
+                "class": e.bot_class,
+                "docs_recorded": e.docs_recorded,
+                "measurements": _public_measurements(e.measurements),
+                "claims": [
+                    {**asdict(s.claim), "is_link": s.is_link,
+                     "contradicted": s.contradicted, "reason": s.reason}
+                    for s in e.claims
+                ],
+            }
+            for e in entries
+        ],
+    }
