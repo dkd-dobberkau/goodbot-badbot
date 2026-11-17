@@ -10,7 +10,7 @@ Exit 0 if all assertions pass, 1 otherwise.
 """
 import json
 import sys
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from app import catalog
@@ -137,6 +137,63 @@ def main() -> int:
           [c for c in derived if c.question == "robots_txt"], [])
     check("no cloudflare entry, no UA url → no claims",
           catalog.derived_claims("X", None, "curl/8.7.1"), [])
+
+    # ── combine_measurements ────────────────────────────────────────────────
+    t = lambda h, m=0: datetime(2026, 11, 10, h, m)  # noqa: E731
+
+    def agg(ua, visits, honeypot=0, discovery=0, verified=0, failed=0, before=0,
+            first_hit=None, first_robots=None, **named):
+        row = {"user_agent": ua, "visits": visits, "honeypot": honeypot, "discovery": discovery,
+               "verified_since": verified, "failed_since": failed, "signed_before": before,
+               "first_honeypot_ts": first_hit, "first_robots_ts": first_robots}
+        row.update(named)
+        return row
+
+    gpt_a = "Mozilla/5.0 (compatible; GPTBot/1.2; +https://openai.com/gptbot)"
+    gpt_b = "Mozilla/5.0 (compatible; GPTBot/1.1)"
+    named_rows = [
+        agg(gpt_a, 10, honeypot=2, first_hit=t(9), first_robots=t(8), bot_name="GPTBot", operator="OpenAI"),
+        agg(gpt_b, 3, first_robots=t(12), bot_name="GPTBot", operator="OpenAI"),
+        agg("ClaudeBot/1.0", 4, honeypot=2, first_hit=t(7), bot_name="ClaudeBot", operator="Anthropic"),
+        agg("PetalBot", 2, honeypot=1, first_hit=t(6), first_robots=t(11), bot_name="PetalBot", operator="Huawei"),
+        agg("YouBot/1.0", 1, before=2, bot_name="YouBot", operator="You.com"),
+    ]
+    # One address claims ClaudeBot and GPTBot within 60 s: both visits are spoofed.
+    named_visits = [
+        {"id": 1, "ts": t(7), "ip_hash": "aa", "bot_name": "ClaudeBot", "operator": "Anthropic",
+         "path": "/private/.env", "is_honeypot": 1},
+        {"id": 2, "ts": t(7), "ip_hash": "aa", "bot_name": "GPTBot", "operator": "OpenAI",
+         "path": "/", "is_honeypot": 0},
+        {"id": 3, "ts": t(9), "ip_hash": "bb", "bot_name": "ClaudeBot", "operator": "Anthropic",
+         "path": "/private/.env", "is_honeypot": 1},
+    ]
+    crawler_rows = [
+        agg("Mozilla/5.0 (compatible; AhrefsBot/7.0; +http://ahrefs.com/robot/)", 30, failed=3),
+        agg("Mozilla/5.0 (compatible; AhrefsBot/7.1; +http://ahrefs.com/robot/)", 5, honeypot=1,
+            first_hit=t(5)),
+        agg("curl/8.7.1", 9, honeypot=4),
+    ]
+    measured = catalog.combine_measurements(named_rows, named_visits, crawler_rows)
+
+    check("two GPTBot UAs sum", measured["GPTBot"].visits, 13)
+    check("top UA is the busier one", measured["GPTBot"].top_user_agent, gpt_a)
+    check("spoofed honeypot hit is not charged to ClaudeBot", measured["ClaudeBot"].honeypot_hits, 1)
+    check("ClaudeBot name used in one spoofed visit", measured["ClaudeBot"].spoofed_by_others, 1)
+    check("AI bots are spoof-filtered", measured["ClaudeBot"].spoof_filtered, True)
+    check("AhrefsBot UAs merge", measured["AhrefsBot"].visits, 35)
+    check("crawlers are not spoof-filtered", measured["AhrefsBot"].spoof_filtered, False)
+    check("crawler class", measured["AhrefsBot"].bot_class, "crawler")
+    check("crawler operator", measured["AhrefsBot"].operator, "Ahrefs")
+    check("HTTP clients are not catalogued", "curl" in measured, False)
+    check("robots.txt read before the first hit", measured["GPTBot"].robots_read_before_first_hit, True)
+    check("robots.txt read only after the first hit", measured["PetalBot"].robots_read_before_first_hit, False)
+    check("hit without any robots.txt read", measured["AhrefsBot"].robots_read_before_first_hit, False)
+    check("no hits at all → None", catalog.combine_measurements(
+        [agg("X", 1, bot_name="GPTBot", operator="OpenAI")], [], [])["GPTBot"].robots_read_before_first_hit, None)
+    check("signed before the fix only", (measured["YouBot"].signed_before_fix,
+          measured["YouBot"].signed_verified, measured["YouBot"].signed_failed), (2, 0, 0))
+    check("crawler failed signatures sum", measured["AhrefsBot"].signed_failed, 3)
+    check("empty inputs", catalog.combine_measurements([], [], []), {})
 
     print(f"\n{total - failures}/{total} passed")
     return 0 if failures == 0 else 1
