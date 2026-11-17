@@ -14,11 +14,11 @@ import json
 import re
 from collections import Counter
 from dataclasses import asdict, dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from app import facts, spoofing
-from app.bots import CLASS_AI, CLASS_CRAWLER, classify_ua
+from app.bots import CLASS_AI, CLASS_CRAWLER, NON_AI_CRAWLERS, classify_ua
 
 QUESTIONS = ("operator", "robots_txt", "recognition", "signing", "docs_opt_out")
 SOURCES = ("user-agent", "cloudflare", "operator-docs", "signature-directory")
@@ -38,6 +38,9 @@ _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 # A UA's "+https://…" info URL. The UA is attacker-controlled, so the match
 # stops at anything that could close a parenthesis, a tag or an attribute.
 _UA_INFO_URL = re.compile(r"\+(https?://[^\s;)<>\"']+)")
+# Only these URLs become links. cf_bots.json is a third-party copy and holds
+# scheme-less values, leading spaces and could hold javascript: URLs.
+_LINKABLE_URL = re.compile(r"^https?://[^\s<>\"']+$")
 
 
 @dataclass(frozen=True)
@@ -107,10 +110,16 @@ def validate_claims(raw: dict, cf_slugs: set[str], today: date) -> list[str]:
     return errors
 
 
+def _utc_today() -> date:
+    # The container runs in UTC; a date recorded in Germany just after
+    # midnight must not count as "in the future" and stop the app starting.
+    return datetime.now(timezone.utc).date()
+
+
 def load_claims(path: Path, cf_slugs: set[str]) -> dict[str, BotClaims]:
     """Parse and validate the claims file, keyed by every name in `match`."""
     raw = json.loads(path.read_text(encoding="utf-8"))
-    errors = validate_claims(raw, cf_slugs, date.today())
+    errors = validate_claims(raw, cf_slugs, _utc_today())
     if errors:
         raise ValueError("invalid bot claims:\n" + "\n".join(errors))
     by_name = {}
@@ -193,9 +202,11 @@ def combine_measurements(named_rows: list[dict], named_visits: list[dict],
                          crawler_ua_rows: list[dict]) -> dict[str, Measurements]:
     """Per-name measurements from per-UA aggregates.
 
-    AI bots are named at write time and spoof-filtered like the scoreboard.
-    Non-AI crawlers are named by classifying each distinct UA (not each row);
-    their rows carry no bot_name, so they cannot be spoof-filtered."""
+    AI bots are named at write time; named_rows must already exclude spoofed
+    visits (fetch_measurements does that in SQL), and named_visits is only
+    used to count how often each name was borrowed. Non-AI crawlers are named
+    by classifying each distinct UA (not each row); their rows carry no
+    bot_name, so they cannot be spoof-filtered."""
     measured: dict[str, Measurements] = {}
     for row in named_rows:
         name = row["bot_name"]
@@ -206,11 +217,8 @@ def combine_measurements(named_rows: list[dict], named_visits: list[dict],
     spoofed_ids = spoofing.find_spoofed_visit_ids(named_visits)
     for visit in named_visits:
         entry = measured.get(visit["bot_name"])
-        if entry is None or visit["id"] not in spoofed_ids:
-            continue
-        entry.spoofed_by_others += 1
-        if visit["is_honeypot"]:
-            entry.honeypot_hits -= 1
+        if entry is not None and visit["id"] in spoofed_ids:
+            entry.spoofed_by_others += 1
 
     for row in crawler_ua_rows:
         bot_class, name, operator = classify_ua(row["user_agent"])
@@ -250,28 +258,42 @@ def _aggregate_columns(discovery_paths: tuple[str, ...], discovery_prefixes: tup
     return columns, params
 
 
+def _like_pattern(key: str) -> str:
+    escaped = key.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"
+
+
 async def fetch_measurements(cur, discovery_paths: tuple[str, ...],
                              discovery_prefixes: tuple[str, ...]) -> dict[str, Measurements]:
     columns, params = _aggregate_columns(discovery_paths, discovery_prefixes)
-    await cur.execute(
-        f"SELECT bot_name, operator, {columns} FROM visits "
-        "WHERE bot_name IS NOT NULL GROUP BY bot_name, operator, user_agent",
-        params,
-    )
-    named_rows = await cur.fetchall()
+    # Spoofed visits first, so every AI measurement can exclude them: the
+    # visit count, robots.txt timing and top UA, not only the honeypot hits.
     await cur.execute("""
         SELECT id, ts, ip_hash, bot_name, operator, path, is_honeypot
         FROM visits
         WHERE bot_name IS NOT NULL AND ip_hash IS NOT NULL
     """)
-    named_visits = await cur.fetchall()
+    named_visits = list(await cur.fetchall())
+    spoofed_ids = sorted(spoofing.find_spoofed_visit_ids(named_visits))
+    not_spoofed = f"AND id NOT IN ({','.join(['%s'] * len(spoofed_ids))})" if spoofed_ids else ""
     await cur.execute(
-        f"SELECT {columns} FROM visits WHERE bot_name IS NULL "
+        f"SELECT bot_name, operator, {columns} FROM visits "
+        f"WHERE bot_name IS NOT NULL {not_spoofed} GROUP BY bot_name, operator, user_agent",
+        (*params, *spoofed_ids),
+    )
+    named_rows = await cur.fetchall()
+    # Only UAs that can classify as a named crawler: browser UAs and scanners
+    # rotating random strings must not use up the group limit and push a
+    # one-visit crawler out of the catalog.
+    patterns = tuple(_like_pattern(key) for key in NON_AI_CRAWLERS)
+    matches = " OR ".join(["LOWER(user_agent) LIKE %s"] * len(patterns))
+    await cur.execute(
+        f"SELECT {columns} FROM visits WHERE bot_name IS NULL AND ({matches}) "
         f"GROUP BY user_agent ORDER BY visits DESC LIMIT {CRAWLER_UA_GROUP_LIMIT}",
-        params,
+        (*params, *patterns),
     )
     crawler_ua_rows = await cur.fetchall()
-    return combine_measurements(list(named_rows), list(named_visits), list(crawler_ua_rows))
+    return combine_measurements(list(named_rows), named_visits, list(crawler_ua_rows))
 
 
 @dataclass(frozen=True)
@@ -326,7 +348,8 @@ def build_catalog(claims: dict[str, BotClaims], cf_by_slug: dict[str, dict],
         shown = []
         for claim in all_claims:
             reason = _contradiction(claim, measured)
-            shown.append(ShownClaim(claim, is_link=bool(claim.url) and claim.source != "user-agent",
+            linkable = bool(claim.url and _LINKABLE_URL.match(claim.url))
+            shown.append(ShownClaim(claim, is_link=linkable and claim.source != "user-agent",
                                     contradicted=bool(reason), reason=reason))
         entries.append(CatalogEntry(name, measured.operator, measured.bot_class,
                                     bool(stored and stored.docs_recorded), shown, measured))
@@ -503,7 +526,7 @@ def _claim_markdown(shown: ShownClaim, with_question: bool = False) -> str:
     claim = shown.claim
     source = SOURCE_LABELS[claim.source] + (f", {claim.retrieved}" if claim.retrieved else "")
     if shown.is_link:
-        source = f"[{source}]({claim.url})"
+        source = f"[{source}](<{claim.url}>)"
     elif claim.url:
         source += f": {_md_code(claim.url)}"
     text = (f"{QUESTION_LABELS[claim.question]}: " if with_question else "") + f"{claim.value} ({source})"

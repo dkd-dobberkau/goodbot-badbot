@@ -8,9 +8,10 @@ a URL taken from a User-Agent is never trusted.
 Run with: python test_catalog.py
 Exit 0 if all assertions pass, 1 otherwise.
 """
+import asyncio
 import json
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from app import catalog
@@ -154,7 +155,7 @@ def main() -> int:
     named_rows = [
         agg(gpt_a, 10, honeypot=2, first_hit=t(9), first_robots=t(8), bot_name="GPTBot", operator="OpenAI"),
         agg(gpt_b, 3, first_robots=t(12), bot_name="GPTBot", operator="OpenAI"),
-        agg("ClaudeBot/1.0", 4, honeypot=2, first_hit=t(7), bot_name="ClaudeBot", operator="Anthropic"),
+        agg("ClaudeBot/1.0", 4, honeypot=1, first_hit=t(9), bot_name="ClaudeBot", operator="Anthropic"),
         agg("PetalBot", 2, honeypot=1, first_hit=t(6), first_robots=t(11), bot_name="PetalBot", operator="Huawei"),
         agg("YouBot/1.0", 1, before=2, bot_name="YouBot", operator="You.com"),
     ]
@@ -177,7 +178,7 @@ def main() -> int:
 
     check("two GPTBot UAs sum", measured["GPTBot"].visits, 13)
     check("top UA is the busier one", measured["GPTBot"].top_user_agent, gpt_a)
-    check("spoofed honeypot hit is not charged to ClaudeBot", measured["ClaudeBot"].honeypot_hits, 1)
+    check("named rows are taken as already spoof-filtered", measured["ClaudeBot"].honeypot_hits, 1)
     check("ClaudeBot name used in one spoofed visit", measured["ClaudeBot"].spoofed_by_others, 1)
     check("AI bots are spoof-filtered", measured["ClaudeBot"].spoof_filtered, True)
     check("AhrefsBot UAs merge", measured["AhrefsBot"].visits, 35)
@@ -194,6 +195,31 @@ def main() -> int:
           measured["YouBot"].signed_verified, measured["YouBot"].signed_failed), (2, 0, 0))
     check("crawler failed signatures sum", measured["AhrefsBot"].signed_failed, 3)
     check("empty inputs", catalog.combine_measurements([], [], []), {})
+
+    # ── fetch_measurements (SQL shape, against a recording cursor) ─────────
+    class RecordingCursor:
+        def __init__(self, results):
+            self.results, self.queries = list(results), []
+
+        async def execute(self, sql, params=None):
+            self.queries.append((sql, tuple(params or ())))
+
+        async def fetchall(self):
+            return self.results.pop(0)
+
+    cur = RecordingCursor([named_visits, named_rows, crawler_rows])
+    asyncio.run(catalog.fetch_measurements(cur, ("/llms.txt",), ("/facts/",)))
+    check("every query has as many %s as parameters",
+          [sql.count("%s") == len(params) for sql, params in cur.queries], [True, True, True])
+    named_sql, named_params = cur.queries[1]
+    check("spoofed visits are excluded from every AI measurement",
+          "id NOT IN" in named_sql and {1, 2} <= set(named_params), True)
+    crawler_sql, crawler_params = cur.queries[2]
+    check("crawler query is narrowed to named crawler patterns",
+          "%ahrefsbot%" in crawler_params and "%barkrowler%" in crawler_params, True)
+    check("no LIKE wildcard leaks from a pattern",
+          all(p.count("%") == 2 for p in crawler_params if isinstance(p, str) and p.startswith("%")), True)
+    check("claims are dated against UTC", catalog._utc_today(), datetime.now(timezone.utc).date())
 
     # ── build_catalog ───────────────────────────────────────────────────────
     def m(name, bot_class="ai", visits=5, hits=0, **kw):
@@ -241,6 +267,25 @@ def main() -> int:
     check("summary", summary, catalog.CatalogSummary(bots=4, docs_recorded=3, with_contradiction=1))
     check("1 hit is singular", catalog.build_catalog(
         claims, {}, {"GPTBot": m("GPTBot", hits=1)})[0][0].claims[0].reason, "1 honeypot hit")
+
+    # Cloudflare's file is a third-party copy: only plain http(s) URLs may link.
+    def operator_link(url):
+        entry = {**cf_entry, "operatorUrl": url, "signatureAgentUrl": None}
+        built = catalog.build_catalog(
+            {"GPTBot": claims["GPTBot"]}, {"gptbot": entry}, {"GPTBot": m("GPTBot")})[0][0]
+        return [c.is_link for c in built.claims if c.claim.question == "operator"]
+    check("javascript: URL is not a link", operator_link("javascript:alert(4)"), [False])
+    check("scheme-less URL is not a link", operator_link("authory.com"), [False])
+    check("URL with a space is not a link", operator_link(" https://www.bnf.fr"), [False])
+    check("http URL links", operator_link("http://ahrefs.com/robot/"), [True])
+    js_html = catalog.render_html(*catalog.build_catalog(
+        {"GPTBot": claims["GPTBot"]},
+        {"gptbot": {**cf_entry, "operatorUrl": "javascript:alert(4)"}}, {"GPTBot": m("GPTBot")}))
+    check("no javascript: href in HTML", 'href="javascript:' in js_html, False)
+    link_md = catalog.render_markdown(*catalog.build_catalog(
+        {"GPTBot": claims["GPTBot"]},
+        {"gptbot": {**cf_entry, "operatorUrl": "https://example.test/a_(b)"}}, {"GPTBot": m("GPTBot")}))
+    check("markdown link uses the <url> form", "](<https://example.test/a_(b)>)" in link_md, True)
 
     # ── render_html / render_markdown / to_json ─────────────────────────────
     evil_ua = "Evil/1.0 (+https://x.test/a)</script><img src=x>`rm` | x"
