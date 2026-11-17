@@ -375,25 +375,51 @@ def _summary_line(summary: CatalogSummary) -> str:
             f"recorded · {summary.with_contradiction} with at least one contradicted claim")
 
 
-def _measurement_lines(entry: CatalogEntry) -> list[str]:
-    """Plain-text measurement lines; callers escape them for their format."""
-    m = entry.measurements
-    hits = _plural(m.honeypot_hits, "honeypot hit")
-    if not m.spoof_filtered:
-        hits += " (not checked for spoofing)"
-    lines = [f"{_plural(m.visits, 'visit')} · {hits} · {_plural(m.discovery_reads, 'discovery read')}"]
-    if m.robots_read_before_first_hit is not None:
-        lines.append("read robots.txt before its first honeypot hit: "
-                     + ("yes" if m.robots_read_before_first_hit else "no"))
-    signing = []
+def _hits_text(m: Measurements) -> str:
+    return str(m.honeypot_hits) + ("" if m.spoof_filtered else " (not checked for spoofing)")
+
+
+def _hits_html(m: Measurements) -> str:
+    if m.spoof_filtered:
+        return str(m.honeypot_hits)
+    return f'{m.honeypot_hits}<br><span class="source">not checked for spoofing</span>'
+
+
+def _robots_first_text(m: Measurements) -> str:
+    if m.robots_read_before_first_hit is None:
+        return "—"
+    return "yes" if m.robots_read_before_first_hit else "no"
+
+
+def _signing_text(m: Measurements) -> str:
+    parts = []
     if m.signed_verified or m.signed_failed:
-        signing.append(f"{m.signed_verified} verified, {m.signed_failed} failed since {_SINCE_LABEL}")
+        parts.append(f"{m.signed_verified} verified, {m.signed_failed} failed since {_SINCE_LABEL}")
     if m.signed_before_fix:
-        signing.append(f"{m.signed_before_fix} signed before our verifier fix")
-    lines.append("signed requests: " + ("; ".join(signing) if signing else "none"))
-    if m.spoofed_by_others:
-        lines.append(f"name borrowed in {_plural(m.spoofed_by_others, 'spoofed visit')}")
-    return lines
+        parts.append(f"{m.signed_before_fix} signed before our verifier fix")
+    return "; ".join(parts) or "none"
+
+
+def _bot_notes(entry: CatalogEntry) -> list[str]:
+    notes = []
+    if not entry.docs_recorded:
+        notes.append("operator docs not yet recorded")
+    if entry.measurements.spoofed_by_others:
+        notes.append(f"name borrowed in {_plural(entry.measurements.spoofed_by_others, 'spoofed visit')}")
+    return notes
+
+
+# Table columns: the two questions the measurements can speak to get their
+# own column; the rest share one so the table stays readable.
+_OTHER_QUESTIONS = ("operator", "recognition", "docs_opt_out")
+_HEADERS = ("Bot", "Visits", "Honeypot hits", "Read robots.txt first?", "Signed requests",
+            "Obeys robots.txt?", "Signs its requests?", "Other claims")
+
+
+def _claim_columns(entry: CatalogEntry) -> tuple[list[ShownClaim], list[ShownClaim], list[ShownClaim]]:
+    grouped = _claims_by_question(entry)
+    others = [c for q in _OTHER_QUESTIONS for c in grouped[q]]
+    return grouped["robots_txt"], grouped["signing"], others
 
 
 def _claims_by_question(entry: CatalogEntry) -> dict[str, list[ShownClaim]]:
@@ -403,7 +429,7 @@ def _claims_by_question(entry: CatalogEntry) -> dict[str, list[ShownClaim]]:
     return grouped
 
 
-def _claim_html(shown: ShownClaim) -> str:
+def _claim_html(shown: ShownClaim, with_question: bool = False) -> str:
     claim = shown.claim
     source = html.escape(SOURCE_LABELS[claim.source])
     if claim.retrieved:
@@ -413,7 +439,8 @@ def _claim_html(shown: ShownClaim) -> str:
         source = f'<a href="{url}" rel="nofollow noopener">{source}</a>'
     elif claim.url:
         source += f": <code>{html.escape(claim.url)}</code>"
-    text = f"{html.escape(claim.value)} <span class=\"source\">({source})</span>"
+    label = f"{html.escape(QUESTION_LABELS[claim.question])}: " if with_question else ""
+    text = f"{label}{html.escape(claim.value)} <span class=\"source\">({source})</span>"
     if claim.note:
         text += f" — {html.escape(claim.note)}"
     if shown.contradicted:
@@ -421,26 +448,40 @@ def _claim_html(shown: ShownClaim) -> str:
     return f"<li>{text}</li>"
 
 
-def _entry_html(entry: CatalogEntry) -> str:
-    parts = [f"<h2>{html.escape(entry.name)} · {html.escape(entry.operator)}</h2>"]
-    parts += [f'<p class="article-date">{html.escape(line)}</p>' for line in _measurement_lines(entry)]
-    if entry.measurements.top_user_agent:
-        parts.append(f"<p>Most frequent user agent: <code>{html.escape(entry.measurements.top_user_agent)}</code></p>")
-    if not entry.docs_recorded:
-        parts.append("<p><em>Operator docs: not yet recorded.</em></p>")
-    for question, shown in _claims_by_question(entry).items():
-        items = "".join(_claim_html(s) for s in shown) or "<li>no source</li>"
-        parts.append(f"<h3>{html.escape(QUESTION_LABELS[question])}</h3><ul>{items}</ul>")
-    return "".join(parts)
+def _claims_cell_html(claims: list[ShownClaim], with_question: bool = False) -> str:
+    if not claims:
+        return '<span class="source">no source</span>'
+    return '<ul class="claims">' + "".join(_claim_html(c, with_question) for c in claims) + "</ul>"
+
+
+def _row_html(entry: CatalogEntry) -> str:
+    m = entry.measurements
+    robots, signing, others = _claim_columns(entry)
+    bot = (f'<span class="bot-name">{html.escape(entry.name)}</span>'
+           f'<br><span class="source">{html.escape(entry.operator)}</span>')
+    if m.top_user_agent:
+        bot += f"<br><code>{html.escape(m.top_user_agent)}</code>"
+    for note in _bot_notes(entry):
+        bot += f'<br><em class="source">{html.escape(note)}</em>'
+    cells = (
+        bot, str(m.visits), _hits_html(m), _robots_first_text(m),
+        html.escape(_signing_text(m)), _claims_cell_html(robots), _claims_cell_html(signing),
+        _claims_cell_html(others, with_question=True),
+    )
+    return "<tr>" + "".join(f"<td>{cell}</td>" for cell in cells) + "</tr>"
 
 
 def render_html(entries: list[CatalogEntry], summary: CatalogSummary) -> str:
     if entries:
-        body = "".join(_entry_html(entry) for entry in entries)
+        head = "".join(f'<th scope="col">{html.escape(h)}</th>' for h in _HEADERS)
+        rows = "".join(_row_html(entry) for entry in entries)
+        body = (f'<div class="table-scroll" tabindex="0" role="region" aria-label="{TITLE}">'
+                f'<table class="catalog"><thead><tr>{head}</tr></thead>'
+                f"<tbody>{rows}</tbody></table></div>")
     else:
         body = '<p class="empty">No bots observed yet.</p>'
     content = (
-        f'<main class="article" id="main"><h1 class="article-title">{TITLE}</h1>'
+        f'<main class="article catalog-page" id="main"><h1 class="article-title">{TITLE}</h1>'
         f"<p>{html.escape(INTRO)}</p>"
         f'<p class="article-date">{html.escape(_summary_line(summary))}</p>'
         f"{body}</main>"
@@ -448,42 +489,53 @@ def render_html(entries: list[CatalogEntry], summary: CatalogSummary) -> str:
     return facts._page(TITLE, content)
 
 
+def _md_cell(text: str) -> str:
+    """Text inside a Markdown table cell: a pipe would start a new column."""
+    return text.replace("|", "\\|").replace("\n", " ")
+
+
 def _md_code(text: str) -> str:
     """Untrusted text as an inert Markdown code span."""
     return "`" + text.replace("`", "").replace("\n", " ") + "`"
 
 
-def _claim_markdown(shown: ShownClaim) -> str:
+def _claim_markdown(shown: ShownClaim, with_question: bool = False) -> str:
     claim = shown.claim
     source = SOURCE_LABELS[claim.source] + (f", {claim.retrieved}" if claim.retrieved else "")
     if shown.is_link:
         source = f"[{source}]({claim.url})"
     elif claim.url:
         source += f": {_md_code(claim.url)}"
-    line = f"- {claim.value} ({source})"
+    text = (f"{QUESTION_LABELS[claim.question]}: " if with_question else "") + f"{claim.value} ({source})"
     if claim.note:
-        line += f" — {claim.note}"
+        text += f" — {claim.note}"
     if shown.contradicted:
-        line += f" **contradicted: {shown.reason}**"
-    return line
+        text += f" **contradicted: {shown.reason}**"
+    return text
+
+
+def _claims_cell_markdown(claims: list[ShownClaim], with_question: bool = False) -> str:
+    return "<br>".join(_claim_markdown(c, with_question) for c in claims) or "no source"
 
 
 def render_markdown(entries: list[CatalogEntry], summary: CatalogSummary) -> str:
     lines = [f"# {TITLE}", "", INTRO, "", _summary_line(summary), ""]
     if not entries:
         lines.append("No bots observed yet.")
+    else:
+        lines.append("| " + " | ".join(_HEADERS) + " |")
+        lines.append("|" + "---|" * len(_HEADERS))
     for entry in entries:
-        lines += [f"## {entry.name} · {entry.operator}", ""]
-        lines += [f"- {line}" for line in _measurement_lines(entry)]
-        if entry.measurements.top_user_agent:
-            lines.append(f"- most frequent user agent: {_md_code(entry.measurements.top_user_agent)}")
-        if not entry.docs_recorded:
-            lines.append("- operator docs: not yet recorded")
-        lines.append("")
-        for question, shown in _claims_by_question(entry).items():
-            lines += [f"### {QUESTION_LABELS[question]}", ""]
-            lines += [_claim_markdown(s) for s in shown] or ["- no source"]
-            lines.append("")
+        m = entry.measurements
+        robots, signing, others = _claim_columns(entry)
+        bot = f"**{entry.name}**<br>{entry.operator}"
+        if m.top_user_agent:
+            bot += f"<br>{_md_code(m.top_user_agent)}"
+        bot += "".join(f"<br>_{note}_" for note in _bot_notes(entry))
+        cells = (bot, str(m.visits), _hits_text(m), _robots_first_text(m), _signing_text(m),
+                 _claims_cell_markdown(robots), _claims_cell_markdown(signing),
+                 _claims_cell_markdown(others, with_question=True))
+        lines.append("| " + " | ".join(_md_cell(cell) for cell in cells) + " |")
     return "\n".join(lines) + "\n"
 
 

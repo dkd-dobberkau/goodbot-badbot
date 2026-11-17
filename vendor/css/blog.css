@@ -3,6 +3,7 @@
   --surface: #111111;
   --border: #1e1e1e;
   --row-border: #161616;
+  --scroll-shadow: rgba(255,255,255,0.12);
   --green: #00ff87;
   --red: #ff3b3b;
   --yellow: #ffd166;
@@ -17,6 +18,7 @@
   --surface: #ffffff;
   --border: #e2e2e2;
   --row-border: #efefef;
+  --scroll-shadow: rgba(0,0,0,0.14);
   --green: #007a43;
   --red: #d8261f;
   --yellow: #b07a00;
@@ -230,6 +232,44 @@ header {
 .article .source { color: var(--muted); }
 /* Long user agents and URLs must wrap, not widen the page on a phone. */
 .article code { overflow-wrap: anywhere; }
+
+/* The catalog is one wide table, so its page gets more than the prose width. */
+.article.catalog-page { max-width: 1400px; }
+.table-scroll {
+  overflow-x: auto;
+  /* Edge shadows that show only while there is more table to scroll to
+     (same technique as the dashboard tables). */
+  background:
+    linear-gradient(to right, var(--bg) 30%, transparent) left / 2.5rem 100% no-repeat local,
+    linear-gradient(to left, var(--bg) 30%, transparent) right / 2.5rem 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, var(--scroll-shadow), transparent) left / 0.9rem 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, var(--scroll-shadow), transparent) right / 0.9rem 100% no-repeat scroll;
+}
+.table-scroll:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.catalog { border-collapse: collapse; font-size: 0.85rem; min-width: 1100px; }
+.catalog th {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+  text-align: left;
+  vertical-align: bottom;
+  padding: 0 1rem 0.8rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.catalog td {
+  vertical-align: top;
+  padding: 0.85rem 1rem 0.85rem 0;
+  border-bottom: 1px solid var(--row-border);
+}
+.catalog td:nth-child(n+2):nth-child(-n+4) { font-family: var(--mono); white-space: nowrap; }
+.catalog .bot-name { font-family: var(--mono); font-weight: 700; }
+.catalog td:first-child { min-width: 14rem; }
+.catalog td:first-child code { font-size: 0.75em; }
+@media (max-width: 600px) { .catalog td:first-child { min-width: 9.5rem; } }
+.catalog .claims { margin: 0; padding-left: 1rem; }
+.catalog .claims li { margin-bottom: 0.3rem; }
 
 /* POST INDEX */
 .post-list { list-style: none; margin: 0; padding: 0; }

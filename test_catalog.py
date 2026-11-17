@@ -243,7 +243,7 @@ def main() -> int:
         claims, {}, {"GPTBot": m("GPTBot", hits=1)})[0][0].claims[0].reason, "1 honeypot hit")
 
     # ── render_html / render_markdown / to_json ─────────────────────────────
-    evil_ua = "Evil/1.0 (+https://x.test/a)</script><img src=x>`rm`"
+    evil_ua = "Evil/1.0 (+https://x.test/a)</script><img src=x>`rm` | x"
     evil = catalog.build_catalog(
         claims, cf_by_slug,
         {"GPTBot": m("GPTBot", visits=124, hits=3, ua=evil_ua),
@@ -263,6 +263,14 @@ def main() -> int:
     check("…and never as verified", "verified" in youbot_html.replace("verifier", ""), False)
     check("empty catalog says so",
           "No bots observed yet" in catalog.render_html([], catalog.CatalogSummary(0, 0, 0)), True)
+    check("html: one table", html_out.count("<table"), 1)
+    check("html: one row per bot", html_out.split("<tbody>")[1].count("<tr"), 2)
+    check("html: robots.txt claims column", "Obeys robots.txt?" in html_out, True)
+    md_table = [line for line in md_out.splitlines() if line.startswith("|")]
+    cells = lambda line: len(line.replace("\\|", "").split("|"))  # noqa: E731
+    check("markdown: header, separator and one row per bot", len(md_table), 4)
+    check("markdown: a pipe in the UA does not add a column",
+          {cells(line) for line in md_table}, {cells(md_table[0])})
     as_json = catalog.to_json(*evil)
     check("json serialises", isinstance(json.dumps(as_json), str), True)
     check("json has summary and bots", sorted(as_json), ["bots", "summary"])
