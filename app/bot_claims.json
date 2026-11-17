@@ -966,15 +966,47 @@
       "SemrushBot"
     ],
     "cloudflare_slug": "semrush-bl",
-    "docs_recorded": false,
+    "docs_recorded": true,
     "claims": {
       "robots_txt": [
+        {
+          "value": "no-statement",
+          "url": "https://www.semrush.com/bot/",
+          "retrieved": "2026-11-17",
+          "note": "Page explains blocking via robots.txt but never states outright that the bot obeys it: \"The easiest and quickest way to do this is to use the robots.txt file.\" ... \"To block SemrushBot from crawling your site for a webgraph of links: User-agent: SemrushBot Disallow: /\" ... \"if you think that it keeps ignoring your \"robots.txt\" rules for quite a long time, please provide us with your website URL, the log entries showing SemrushBot crawling the pages that it was not supposed to\"",
+          "source": "operator-docs"
+        },
         {
           "value": "no-statement",
           "source": "cloudflare",
           "url": "https://radar.cloudflare.com/bots/directory/semrush-bl",
           "retrieved": "2026-11-17",
           "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "user-agent tokens only (SemrushBot, SiteAuditBot, SemrushBot-BA, -SI, -SWA, -OCOB, -FT, -ESI, SplitSignalBot, RyteBot); no IP list or reverse DNS published",
+          "url": "https://www.semrush.com/bot/",
+          "retrieved": "2026-11-17",
+          "note": "\"Do not try to block SemrushBot via IP as we do not use any consecutive IP blocks.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "url": "https://www.semrush.com/bot/",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt per user-agent token (User-agent: SemrushBot / Disallow: /); crawl-delay up to 10 s; contact bot@semrush.com",
+          "url": "https://www.semrush.com/bot/",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
         }
       ]
     }
@@ -1036,15 +1068,47 @@
       "MJ12bot"
     ],
     "cloudflare_slug": "mj12bot",
-    "docs_recorded": false,
+    "docs_recorded": true,
     "claims": {
       "robots_txt": [
+        {
+          "value": "obeys",
+          "url": "https://mj12bot.com/",
+          "retrieved": "2026-11-17",
+          "note": "\"Obeys Robots.txt Yes\" and \"MJ12bot adheres to the robots.txt standard.\" Also: \"Please always make sure the bot can actually retrieve robots.txt itself. If it can't then it will assume that it is okay to crawl your site.\"",
+          "source": "operator-docs"
+        },
         {
           "value": "no-statement",
           "source": "cloudflare",
           "url": "https://radar.cloudflare.com/bots/directory/mj12bot",
           "retrieved": "2026-11-17",
           "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "no IP list (distributed community crawler); optional pre-arranged ident string in CRAWLER-IDENT header or User-Agent on request via bot@majestic12.co.uk",
+          "url": "https://mj12bot.com/",
+          "retrieved": "2026-11-17",
+          "note": "\"As a community project unfortunately we don't have the ability to restrict our bots to a limited number of IP addresses ... we can send a pre-arranged ident string with all requests to your site. This can be sent as part of the http or https headers in the 'CRAWLER-IDENT' field, or as part of the User-Agent string.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "url": "https://mj12bot.com/",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt (User-agent: MJ12bot / Disallow: /); Crawl-Delay up to 20 s; do not block by IP",
+          "url": "https://mj12bot.com/",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
         }
       ]
     }
@@ -1055,15 +1119,47 @@
       "DotBot"
     ],
     "cloudflare_slug": "dotbot",
-    "docs_recorded": false,
+    "docs_recorded": true,
     "claims": {
       "robots_txt": [
+        {
+          "value": "obeys",
+          "url": "https://moz.com/help/moz-procedures/crawlers/dotbot",
+          "retrieved": "2026-11-17",
+          "note": "\"If you don't want Dotbot crawling your site, we always respect the standard Robots Exclusion Protocol (aka robots.txt).\" Caveat: \"Dotbot only looks at your robots.txt file the first time it encounters that site during a new index crawl.\"",
+          "source": "operator-docs"
+        },
         {
           "value": "no-statement",
           "source": "cloudflare",
           "url": "https://radar.cloudflare.com/bots/directory/dotbot",
           "retrieved": "2026-11-17",
           "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "user-agent token dotbot only; no IP list or reverse DNS published",
+          "url": "https://moz.com/help/moz-procedures/crawlers/dotbot",
+          "retrieved": "2026-11-17",
+          "note": "\"When this happens, the user-agent, Dotbot, is used to identify our crawler.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "url": "https://moz.com/help/moz-procedures/crawlers/dotbot",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt (User-agent: dotbot / Disallow: /); Crawl-delay supported",
+          "url": "https://moz.com/help/moz-procedures/crawlers/dotbot",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
         }
       ]
     }
@@ -1074,15 +1170,54 @@
       "SERankingBacklinksBot"
     ],
     "cloudflare_slug": "serankingbacklinksbot",
-    "docs_recorded": false,
+    "docs_recorded": true,
     "claims": {
       "robots_txt": [
+        {
+          "value": "obeys",
+          "url": "https://help.seranking.com/hc/en-us/articles/23020353159964-SERankingBacklinksBot-Crawler",
+          "retrieved": "2026-11-17",
+          "note": "\"SERankingBacklinksBot always respects the rules you specify in your robots.txt file.\" Caveat: \"please give the crawler up to a day to fully stop crawling your website.\" (The UA URL https://seranking.com/backlinks-crawler redirects here; page returns 403 to curl, read via Playwright.)",
+          "source": "operator-docs"
+        },
         {
           "value": "no-statement",
           "source": "cloudflare",
           "url": "https://radar.cloudflare.com/bots/directory/serankingbacklinksbot",
           "retrieved": "2026-11-17",
           "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "reverse DNS *.seranking.com",
+          "url": "https://help.seranking.com/hc/en-us/articles/23020353159964-SERankingBacklinksBot-Crawler",
+          "retrieved": "2026-11-17",
+          "note": "\"Reverse DNS lookup by the bot's IP should show you one of the sub-domains of *.seranking.com domain wildcard.\"",
+          "source": "operator-docs"
+        },
+        {
+          "value": "IP list https://api.seranking.com/backlinks-bot-ips (?txt=1, ?v=6)",
+          "url": "https://help.seranking.com/hc/en-us/articles/23020353159964-SERankingBacklinksBot-Crawler",
+          "retrieved": "2026-11-17",
+          "note": "\"This service provides an up-to-date list of IP addresses used by our web crawlers.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "url": "https://help.seranking.com/hc/en-us/articles/23020353159964-SERankingBacklinksBot-Crawler",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt (User-agent: SERankingBacklinksBot / Disallow: /); Crawl-delay supported, default 3 s; contact crawler@seranking.com",
+          "url": "https://help.seranking.com/hc/en-us/articles/23020353159964-SERankingBacklinksBot-Crawler",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
         }
       ]
     }
@@ -1093,7 +1228,7 @@
       "SERanking"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
+    "docs_recorded": true,
     "claims": {}
   },
   "moptimizer": {
@@ -1102,7 +1237,7 @@
       "mOptimizer"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
+    "docs_recorded": true,
     "claims": {}
   },
   "screaming-frog": {
@@ -1111,8 +1246,42 @@
       "Screaming Frog"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "obeys",
+          "url": "https://www.screamingfrog.co.uk/seo-spider/user-guide/configuration/",
+          "retrieved": "2026-11-17",
+          "note": "Default only: \"By default the SEO Spider will obey robots.txt protocol and is set to 'Respect robots.txt'. This means the SEO Spider will not be able to crawl a site if its disallowed via robots.txt.\"",
+          "source": "operator-docs"
+        },
+        {
+          "value": "does-not-obey",
+          "url": "https://www.screamingfrog.co.uk/seo-spider/user-guide/configuration/",
+          "retrieved": "2026-11-17",
+          "note": "User-configurable: \"This setting can be adjusted to 'Ignore robots.txt', or 'Ignore robots.xt but report status'.\" ... \"The 'Ignore robots.txt' option allows you to ignore this protocol, which is down to the responsibility of the user.\" Also: \"List mode also sets the spider to ignore robots.txt by default\"",
+          "source": "operator-docs"
+        }
+      ],
+      "recognition": [
+        {
+          "value": "default user-agent 'Screaming Frog SEO Spider', but users can change it; no IP list (runs on users' own machines)",
+          "url": "https://www.screamingfrog.co.uk/seo-spider/user-guide/configuration/",
+          "retrieved": "2026-11-17",
+          "note": "\"The user-agent configuration allows you to switch the user-agent of the HTTP requests made by the SEO Spider and which robots.txt directives are followed. By default the SEO Spider makes requests using its own 'Screaming Frog SEO Spider user-agent string.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "url": "https://www.screamingfrog.co.uk/seo-spider/user-guide/configuration/",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
+        }
+      ]
+    }
   },
   "googlebot": {
     "name": "Googlebot",
@@ -1120,15 +1289,49 @@
       "Googlebot"
     ],
     "cloudflare_slug": "google",
-    "docs_recorded": false,
+    "docs_recorded": true,
     "claims": {
       "robots_txt": [
+        {
+          "value": "obeys",
+          "url": "https://developers.google.com/crawling/docs/crawlers-fetchers/google-common-crawlers",
+          "retrieved": "2026-11-17",
+          "note": "\"Google's common crawlers are used to find information for building Google's search indexes, perform other product specific crawls, and for analysis. They always obey robots.txt rules when crawling automatically.\" (Googlebot is listed as a common crawler; the verification page repeats: \"They always respect robots.txt rules for automatic crawls.\")",
+          "source": "operator-docs"
+        },
         {
           "value": "no-statement",
           "source": "cloudflare",
           "url": "https://radar.cloudflare.com/bots/directory/google",
           "retrieved": "2026-11-17",
           "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "reverse DNS crawl-***-***-***-***.googlebot.com or geo-crawl-***-***-***-***.geo.googlebot.com; IP ranges https://developers.google.com/static/crawling/ipranges/common-crawlers.json",
+          "url": "https://developers.google.com/crawling/docs/crawlers-fetchers/verify-google-requests",
+          "retrieved": "2026-11-17",
+          "note": "\"Common crawlers The common crawlers used for Google's products (such as Googlebot). They always respect robots.txt rules for automatic crawls. crawl-***-***-***-***.googlebot.com or geo-crawl-***-***-***-***.geo.googlebot.com common-crawlers.json\" / \"Verify that the domain name is either googlebot.com , google.com , or googleusercontent.com . Run a forward DNS lookup on the domain name retrieved in step 1\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "url": "https://developers.google.com/search/docs/crawling-indexing/googlebot",
+          "retrieved": "2026-11-17",
+          "note": "Googlebot page says nothing about signing. Google's separate Web Bot Auth page applies to agents, not Googlebot: \"We are testing the protocol with some AI agents hosted on Google infrastructure.\" and \"We don't sign every request of a particular agent.\" (https://developers.google.com/crawling/docs/crawlers-fetchers/web-bot-auth)",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt to block crawling; noindex to prevent indexing; password protection to make it inaccessible",
+          "url": "https://developers.google.com/search/docs/crawling-indexing/googlebot",
+          "retrieved": "2026-11-17",
+          "note": "\"blocking Googlebot from crawling a page doesn't prevent the URL of the page from appearing in search results: Prevent Googlebot from crawling a page? Use a robots.txt file .\"",
+          "source": "operator-docs"
         }
       ]
     }
@@ -1139,15 +1342,48 @@
       "bingbot"
     ],
     "cloudflare_slug": "bing",
-    "docs_recorded": false,
+    "docs_recorded": true,
     "claims": {
       "robots_txt": [
+        {
+          "value": "no-statement",
+          "url": "https://www.bing.com/webmasters/help/which-crawlers-does-bing-use-8c184ec0",
+          "retrieved": "2026-11-17",
+          "note": "Bing gives robots.txt only as a control option: \"To control how our crawlers interact with your website, you have two options: Robots.txt files can be configured to tell Bing crawlers how to interact with your website.\" The robots.txt help page (https://www.bing.com/webmasters/help/?topicid=cb7c31ec) says: \"On finding a specific set of instructions for itself, Bingbot will ignore the directives listed in the generic section\". Neither page says outright that Bingbot obeys robots.txt. Both pages render only with JS, so the text was read via a browser.",
+          "source": "operator-docs"
+        },
         {
           "value": "no-statement",
           "source": "cloudflare",
           "url": "https://radar.cloudflare.com/bots/directory/bing",
           "retrieved": "2026-11-17",
           "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "reverse DNS ending in search.msn.com plus forward confirmation; Verify Bingbot tool; IP list https://www.bing.com/toolbox/bingbot.json",
+          "url": "https://www.bing.com/webmasters/help/how-to-verify-bingbot-3905dc26",
+          "retrieved": "2026-11-17",
+          "note": "\"Perform a reverse DNS lookup using the IP address from the logs to verify that it resolves to a name that end with search.msn.com\" / \"Or alternatively, you can identify Bingbot by IP address by matching the crawler's IP address to the list of Bingbot IP addresses. Refresh this list daily as we can change this list any time.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "url": "https://www.bing.com/webmasters/help/how-to-verify-bingbot-3905dc26",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt; hourly crawl-rate control in Bing Webmaster Tools (Crawl control)",
+          "url": "https://www.bing.com/webmasters/help/which-crawlers-does-bing-use-8c184ec0",
+          "retrieved": "2026-11-17",
+          "note": "\"Bing Webmaster Tools allow you to control crawl rates by the hour using the Crawl control tool.\"",
+          "source": "operator-docs"
         }
       ]
     }
@@ -1158,15 +1394,48 @@
       "Baiduspider"
     ],
     "cloudflare_slug": "baidu",
-    "docs_recorded": false,
+    "docs_recorded": true,
     "claims": {
       "robots_txt": [
+        {
+          "value": "obeys",
+          "url": "https://help.baidu.com/question?prod_id=99&class=476&id=2996",
+          "retrieved": "2026-11-17",
+          "note": "\"Baiduspider遵守互联网robots协议。您可以利用robots.txt文件完全禁止Baiduspider访问您的网站，或者禁止Baiduspider访问您网站上的部分文件。\" (\"Baiduspider obeys the Internet robots protocol. You can use robots.txt to block Baiduspider from your whole site or from some files.\") Exceptions named on the same page: \"Baiduspider-cpro抓取的网页并不会建入索引，只是执行与客户约定的操作，所以不遵守robots协议\" (Baiduspider-cpro, and likewise Baiduspider-ads, do not follow robots).",
+          "source": "operator-docs"
+        },
         {
           "value": "no-statement",
           "source": "cloudflare",
           "url": "https://radar.cloudflare.com/bots/directory/baidu",
           "retrieved": "2026-11-17",
           "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "reverse DNS *.baidu.com or *.baidu.jp plus forward DNS confirmation (e.g. baiduspider-123-125-66-120.crawl.baidu.com)",
+          "url": "https://help.baidu.com/question?prod_id=99&class=476&id=2996",
+          "retrieved": "2026-11-17",
+          "note": "\"Baiduspider的hostname以 *.baidu.com 或 *.baidu.jp 的格式命名，非 *.baidu.com 或 *.baidu.jp 即为冒充。\" (hostnames in *.baidu.com or *.baidu.jp; anything else is an impostor)",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "url": "https://help.baidu.com/question?prod_id=99&class=476&id=2996",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt (User-agent: Baiduspider / Disallow: /), per-product user agents such as Baiduspider-image",
+          "url": "https://help.baidu.com/question?prod_id=99&class=476&id=2996",
+          "retrieved": "2026-11-17",
+          "note": "\"以下robots实现禁止所有来自百度的抓取： User-agent: Baiduspider Disallow: /\"",
+          "source": "operator-docs"
         }
       ]
     }
@@ -1177,15 +1446,48 @@
       "YandexBot"
     ],
     "cloudflare_slug": "yandex",
-    "docs_recorded": false,
+    "docs_recorded": true,
     "claims": {
       "robots_txt": [
+        {
+          "value": "obeys",
+          "url": "https://yandex.com/support/webmaster/en/robot-workings/check-yandex-robots.html",
+          "retrieved": "2026-11-17",
+          "note": "The robot table has the column \"Takes into account the General rules specified in robots.txt\"; the YandexBot row reads \"Mozilla/5.0 (compatible; YandexBot/3.0; +http://yandex.com/bots) The main indexing robot. Yes\". The same page says other Yandex robots \"may ignore the file's restrictive directives robots.txt designed for arbitrary robots ( User-agent: * )\" and \"robots may ignore some robots.txt restrictions for certain sites if there is an agreement between \\\"Yandex\\\" and the owners of those sites.\" The wording is \"takes into account\", not \"obeys\".",
+          "source": "operator-docs"
+        },
         {
           "value": "no-statement",
           "source": "cloudflare",
           "url": "https://radar.cloudflare.com/bots/directory/yandex",
           "retrieved": "2026-11-17",
           "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "reverse DNS ending yandex.ru, yandex.net or yandex.com plus forward DNS; IP list not published",
+          "url": "https://yandex.com/support/webmaster/en/robot-workings/check-yandex-robots.html",
+          "retrieved": "2026-11-17",
+          "note": "\"All Yandex robots have names ending in yandex.ru , yandex.net or yandex.com . If the host name has a different ending, the robot does not belong to Yandex.\" / \"Bots use an offline network : AS13238, AS208722 and AS212066, as well as IP addresses that change frequently. Therefore, their list is not disclosed.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "url": "https://yandex.com/support/webmaster/en/robot-workings/check-yandex-robots.html",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt with directives addressed to the specific robot",
+          "url": "https://yandex.com/support/webmaster/en/robot-workings/check-yandex-robots.html",
+          "retrieved": "2026-11-17",
+          "note": "\"To restrict access to such robots to the site, use directives specifically for them\"",
+          "source": "operator-docs"
         }
       ]
     }
@@ -1196,15 +1498,48 @@
       "SeznamBot"
     ],
     "cloudflare_slug": "seznam",
-    "docs_recorded": false,
+    "docs_recorded": true,
     "claims": {
       "robots_txt": [
+        {
+          "value": "obeys",
+          "url": "https://o-seznam.cz/napoveda/vyhledavani/en/crawling-control/",
+          "retrieved": "2026-11-17",
+          "note": "\"SeznamBot fully complies with the robots exclusion standard (or simply robots.txt ), which specifies the rules of robots behavior through a robots.txt file.\"",
+          "source": "operator-docs"
+        },
         {
           "value": "no-statement",
           "source": "cloudflare",
           "url": "https://radar.cloudflare.com/bots/directory/seznam",
           "retrieved": "2026-11-17",
           "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "IP ranges 77.75.76.x-77.75.79.x (+IPv6); PTR fulltextrobot-*.seznam.cz; JSON list https://search.seznam.cz/ipranges/seznambot.json",
+          "url": "https://o-seznam.cz/napoveda/vyhledavani/en/seznambot-crawler/",
+          "retrieved": "2026-11-17",
+          "note": "\"All used SeznamBot IP addresses should have a reverse DNS record that looks like this: ... fulltextrobot-77-75-77-xxx.seznam.cz\" / \"A list of all IP addresses used by SeznamBot is also available in JSON format.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "url": "https://o-seznam.cz/napoveda/vyhledavani/en/seznambot-crawler/",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt (User-agent: SeznamBot / Disallow: /); Request-rate directive to limit crawl speed",
+          "url": "https://o-seznam.cz/napoveda/vyhledavani/en/crawling-control/",
+          "retrieved": "2026-11-17",
+          "note": "\"If you want to keep SeznamBot from accessing your site altogether, use the following directives in your robots.txt file: User-agent: SeznamBot Disallow: /\"",
+          "source": "operator-docs"
         }
       ]
     }
@@ -1215,15 +1550,39 @@
       "DuckDuckBot"
     ],
     "cloudflare_slug": "duckduckbot",
-    "docs_recorded": false,
+    "docs_recorded": true,
     "claims": {
       "robots_txt": [
+        {
+          "value": "obeys",
+          "url": "https://duckduckgo.com/duckduckgo-help-pages/results/duckduckbot",
+          "retrieved": "2026-11-17",
+          "note": "\"DuckDuckBot respects https://robotstxt.org/ .\" (The sentence links to the robots exclusion standard site and does not say \"robots.txt\" itself.)",
+          "source": "operator-docs"
+        },
         {
           "value": "no-statement",
           "source": "cloudflare",
           "url": "https://radar.cloudflare.com/bots/directory/duckduckbot",
           "retrieved": "2026-11-17",
           "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "IP list https://duckduckgo.com/duckduckbot.json",
+          "url": "https://duckduckgo.com/duckduckgo-help-pages/results/duckduckbot",
+          "retrieved": "2026-11-17",
+          "note": "\"The full list of IP addresses is available at https://duckduckgo.com/duckduckbot.json\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "url": "https://duckduckgo.com/duckduckgo-help-pages/results/duckduckbot",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
         }
       ]
     }
@@ -1234,8 +1593,35 @@
       "Sogou Spider"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "url": "https://www.sogou.com/docs/help/webmasters.htm",
+          "retrieved": "2026-11-17",
+          "note": "\"Q. 如何 sogou spider 不抓我的网站？ sogou spider 支持 robots 协议，您可以在网站的根目录放置 robots.txt。\" (\"How do I stop sogou spider from crawling my site? sogou spider supports the robots protocol; you can place robots.txt in your site root.\") The verb is 支持 (\"supports\"), not \"obeys\". The page also says: \"但是新更新的 robots.txt 可能得过几个星期才能体现出效果来。\" (newly updated robots.txt may take several weeks to take effect). This is the page named in the bot's own UA (sogou.com/docs/help/webmasters.htm#07). Recorded as no-statement: \"supports\" the protocol is not a statement that it obeys it.",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "url": "https://www.sogou.com/docs/help/webmasters.htm",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt in site root; complaint form for crawling too fast",
+          "url": "https://www.sogou.com/docs/help/webmasters.htm",
+          "retrieved": "2026-11-17",
+          "note": "\"如果您认为 sogou spider 对于您的网站抓取过快，请与我们联系\" (contact us if sogou spider crawls your site too fast)",
+          "source": "operator-docs"
+        }
+      ]
+    }
   },
   "builtwith": {
     "name": "BuiltWith",
@@ -1243,15 +1629,47 @@
       "BuiltWith"
     ],
     "cloudflare_slug": "builtwith",
-    "docs_recorded": false,
+    "docs_recorded": true,
     "claims": {
       "robots_txt": [
+        {
+          "value": "obeys",
+          "url": "https://builtwith.com/biup",
+          "retrieved": "2026-11-17",
+          "note": "\"We check robots.txt when indexing sites and stop if we find this directive.\" (after the example User-agent: BuiltWith / Disallow: /)",
+          "source": "operator-docs"
+        },
         {
           "value": "no-statement",
           "source": "cloudflare",
           "url": "https://radar.cloudflare.com/bots/directory/builtwith",
           "retrieved": "2026-11-17",
           "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "user-agent only: current BuiltWith/1.4 and BuiltWith/1.5 (historical BW/1.1, BW/1.3); no IP list or reverse DNS published",
+          "url": "https://builtwith.com/biup",
+          "retrieved": "2026-11-17",
+          "note": "\"All our requests contain a User-Agent which will include - ... Current: BuiltWith/1.4; rb.gy/xprgqj BuiltWith/1.5; h1.nu/1ySUD\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "url": "https://builtwith.com/biup",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt (User-agent: BuiltWith / Disallow: /); removal from public profiles via https://builtwith.com/removals",
+          "url": "https://builtwith.com/biup",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
         }
       ]
     }
@@ -1262,15 +1680,47 @@
       "Dataprovider"
     ],
     "cloudflare_slug": "dataprovider-com",
-    "docs_recorded": false,
+    "docs_recorded": true,
     "claims": {
       "robots_txt": [
+        {
+          "value": "obeys",
+          "url": "https://www.dataprovider.com/crawler/",
+          "retrieved": "2026-11-17",
+          "note": "\"The robot exclusion protocol is a set of instructions that specifies which areas of a website a robot can and cannot process. We adhere to these instructions and exclude any directory or content that does not want to be indexed.\" (https://www.dataprovider.com/spider/ redirects here)",
+          "source": "operator-docs"
+        },
         {
           "value": "no-statement",
           "source": "cloudflare",
           "url": "https://radar.cloudflare.com/bots/directory/dataprovider-com",
           "retrieved": "2026-11-17",
           "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "reverse DNS dataproviderbot.com; UA 'Mozilla/5.0 (compatible; Dataprovider.com)'",
+          "url": "https://www.dataprovider.com/crawler/",
+          "retrieved": "2026-11-17",
+          "note": "\"Identify our crawlers by the reverse DNS: if you find 'dataproviderbot.com', you're a part of the network.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "url": "https://www.dataprovider.com/crawler/",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt (User-agent: dataprovider / Disallow: /), robots META noindex/nofollow, or opt-out form at https://www.dataprovider.com/opt-out/",
+          "url": "https://www.dataprovider.com/crawler/",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
         }
       ]
     }
@@ -1281,8 +1731,42 @@
       "Heritrix"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "obeys",
+          "url": "https://github.com/internetarchive/heritrix3",
+          "retrieved": "2026-11-17",
+          "note": "Project README: \"Crawl Operators! Heritrix is designed to respect the robots.txt exclusion directives and META nofollow tags . Please consider the load your crawl will place on seed sites and set politeness policies accordingly.\"",
+          "source": "operator-docs"
+        },
+        {
+          "value": "no-statement",
+          "url": "https://heritrix.readthedocs.io/en/latest/configuring-jobs.html",
+          "retrieved": "2026-11-17",
+          "note": "Framework docs make it an operator setting, not a guarantee: \"The valid values of “robotsPolicyName” are: obey Obey robots.txt directives and nofollow robots meta tags classic Same as “obey” robotsTxtOnly Obey robots.txt directives but ignore robots meta tags ignore Ignore robots.txt directives and robots meta tags\" (example config sets robotsPolicyName = 'obey'). Each operator chooses; the docs give no guarantee for a given Heritrix crawl.",
+          "source": "operator-docs"
+        }
+      ],
+      "recognition": [
+        {
+          "value": "operator-set User-Agent with contact info (no IP list or reverse DNS; Heritrix is run by many operators)",
+          "url": "https://github.com/internetarchive/heritrix3",
+          "retrieved": "2026-11-17",
+          "note": "\"Also, always identify your crawl with contact information in the User-Agent so sites that may be adversely affected by your crawl can contact you or adapt their server behavior accordingly.\" Configuring docs: \"metadata.operatorContactUrl The URI of the crawl initiator. This setting gives the administrator of a crawled host a URI to refer to in case of problems.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "url": "https://github.com/internetarchive/heritrix3",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
+        }
+      ]
+    }
   },
   "censysinspect": {
     "name": "CensysInspect",
@@ -1290,8 +1774,51 @@
       "CensysInspect"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "url": "https://about.censys.io/",
+          "retrieved": "2026-11-17",
+          "note": "No robots.txt statement on Censys's scanner page or its opt-out page. About page: \"We never attempt to bypass any technical barriers, exploit security problems, or otherwise access non-public-facing services, and we follow community best practices to reduce any burden on remote networks.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "recognition": [
+        {
+          "value": "published scanner subnets and ASNs (e.g. 66.132.159.0/24, AS398722) plus the CensysInspect user agent",
+          "url": "https://docs.censys.com/docs/opt-out-of-data-collection",
+          "retrieved": "2026-11-17",
+          "note": "\"you can blocklist the IP ranges that Censys and ASNs that uses for scanning. You can also use this list to permit traffic from Censys scanners.\" ... \"Additionally, Censys HTTP-based scans use a Censys-specific user agent, which can filter requests from our scanners. Mozilla/5.0 (compatible; CensysInspect/1.1; +https://about.censys.io/)\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "url": "https://about.censys.io/",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "block Censys subnets; or request exclusion by email from a WHOIS contact (blocking does not remove historical data)",
+          "url": "https://docs.censys.com/docs/opt-out-of-data-collection",
+          "retrieved": "2026-11-17",
+          "note": "\"Blocking connections from Censys' subnets prevents Censys scanners from indexing your services. However, this does not remove historical data from Censys datasets.\" ... \"Networks and websites can request exclusion from Censys scans.\"",
+          "source": "operator-docs"
+        },
+        {
+          "value": "allowlist or blocklist the listed subnets",
+          "url": "https://about.censys.io/",
+          "retrieved": "2026-11-17",
+          "note": "\"Censys scans the Internet from the subnets listed on this page, which you can allowlist or blocklist if you wish.\"",
+          "source": "operator-docs"
+        }
+      ]
+    }
   },
   "internetmeasurement": {
     "name": "InternetMeasurement",
@@ -1299,8 +1826,44 @@
       "InternetMeasurement"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "no-statement",
+          "url": "https://internet-measurement.com/",
+          "retrieved": "2026-11-17",
+          "note": "No robots.txt statement; the page says: \"We don't perform any form of site crawling.\" Opt-out is by IP blocking only.",
+          "source": "operator-docs"
+        }
+      ],
+      "recognition": [
+        {
+          "value": "published IP ranges on the page (e.g. 87.236.176.0/24, 185.247.137.0/24, 2a06:4880::/29)",
+          "url": "https://internet-measurement.com/",
+          "retrieved": "2026-11-17",
+          "note": "\"Authentic traffic will come only from our IP ranges.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "url": "https://internet-measurement.com/",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "block the listed IP ranges, or email your IP ranges/domains with proof of ownership",
+          "url": "https://internet-measurement.com/",
+          "retrieved": "2026-11-17",
+          "note": "\"To opt out, block our IP ranges.\" ... \"You may also opt out by sending your IP ranges and/or domain names to [email]. We will also need some reasonable method of authenticating you as the end-user of those IPs: an email sent from an address listed in public WHOIS is preferred.\"",
+          "source": "operator-docs"
+        }
+      ]
+    }
   },
   "ibou-search": {
     "name": "ibou-search",
@@ -1308,8 +1871,44 @@
       "ibou-search"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "obeys",
+          "url": "https://www.ibou.com/crawlers.html",
+          "retrieved": "2026-11-17",
+          "note": "\"All four crawlers follow robots.txt, the file where you specify which parts of your site they may explore.\" (UA URL https://ibou.com/crawlers.html redirects to https://www.ibou.com/crawlers.html)",
+          "source": "operator-docs"
+        }
+      ],
+      "recognition": [
+        {
+          "value": "forward-confirmed reverse DNS ending in .ibou.io; IP list https://www.ibou.com/ibousearch-ip-ranges.json",
+          "url": "https://www.ibou.com/crawlers.html",
+          "retrieved": "2026-11-17",
+          "note": "\"Run a reverse DNS lookup on the source IP. The hostname must end in .ibou.io.\" ... \"Resolve that hostname to its IP addresses (A for IPv4, AAAA for IPv6). The original IP must be among them.\" ... \"Both checks are needed. The ibou-search IP ranges (JSON) are also available; this list may change.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "url": "https://www.ibou.com/crawlers.html",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt Disallow for ibou-search (Crawl-delay also supported)",
+          "url": "https://www.ibou.com/crawlers.html",
+          "retrieved": "2026-11-17",
+          "note": "\"To block all four crawlers, add this group to your site’s /robots.txt file: User-agent: ibou-search User-agent: ibou-discovery User-agent: ibou-images User-agent: ibou-news Disallow: /\"",
+          "source": "operator-docs"
+        }
+      ]
+    }
   },
   "iboubot": {
     "name": "IbouBot",
@@ -1317,15 +1916,48 @@
       "IbouBot"
     ],
     "cloudflare_slug": "iboubot-3",
-    "docs_recorded": false,
+    "docs_recorded": true,
     "claims": {
       "robots_txt": [
+        {
+          "value": "obeys",
+          "url": "https://www.ibou.com/iboubot.html",
+          "retrieved": "2026-11-17",
+          "note": "\"Does it respect my robots.txt file? Yes. We respect the robots.txt file and its disallow directives.\" (UA URL https://ibou.io/iboubot.html redirects to https://www.ibou.com/iboubot.html)",
+          "source": "operator-docs"
+        },
         {
           "value": "no-statement",
           "source": "cloudflare",
           "url": "https://radar.cloudflare.com/bots/directory/iboubot-3",
           "retrieved": "2026-11-17",
           "note": "Radar's bot page lists access level, content use and user agent; it no longer states robots.txt behaviour."
+        }
+      ],
+      "recognition": [
+        {
+          "value": "forward-confirmed reverse DNS ending in ibou.io; IP list iboubot-ip-ranges.json; Cloudflare Verified Bot (Search)",
+          "url": "https://www.ibou.com/iboubot.html",
+          "retrieved": "2026-11-17",
+          "note": "\"The reliable way to tell a genuine IbouBot request from an impostor is a forward-confirmed reverse DNS lookup on the source IP address\" ... \"The hostname must end with ibou.io.\" ... \"IbouBot is a Cloudflare Verified Bot, classified under the Search behavior\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "url": "https://www.ibou.com/iboubot.html",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt Disallow for IbouBot (Crawl-Delay also supported)",
+          "url": "https://www.ibou.com/iboubot.html",
+          "retrieved": "2026-11-17",
+          "note": "\"The robots.txt file allows you to prevent IbouBot from crawling part or all of your website, using the disallow directive.\"",
+          "source": "operator-docs"
         }
       ]
     }
@@ -1387,8 +2019,44 @@
       "GeedoShopProductFinder"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "obeys",
+          "url": "https://geedo.com/product-finder/",
+          "retrieved": "2026-11-17",
+          "note": "\"The crawler focuses on publicly accessible product pages and follows robots.txt rules, rate limits, and restrictions defined by site owners.\" Page title is \"GeedoShopProductFinder Crawler\" but the body names the bot \"GeedoProductFinder\". Found via https://geedo.com/bot.html, which redirects here; the UA gives no URL.",
+          "source": "operator-docs"
+        }
+      ],
+      "recognition": [
+        {
+          "value": "forward-confirmed reverse DNS ending in .geedo.com; IP range 83.99.206.0/24",
+          "url": "https://geedo.com/product-finder/",
+          "retrieved": "2026-11-17",
+          "note": "\"validate the IP using reverse and forward DNS checks\" ... \"Ensure the returned hostname ends with .geedo.com.\" ... \"GeedoProductFinder operates only from documented IP ranges: 83.99.206.0/24\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "not stated",
+          "url": "https://geedo.com/product-finder/",
+          "retrieved": "2026-11-17",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt Disallow / Crawl-delay for GeedoProductFinder",
+          "url": "https://geedo.com/product-finder/",
+          "retrieved": "2026-11-17",
+          "note": "\"To restrict the crawler from accessing specific paths, include a robots.txt rule: User-agent: GeedoProductFinder Disallow: /forum\"",
+          "source": "operator-docs"
+        }
+      ]
+    }
   },
   "exasearchbot": {
     "name": "ExaSearchBot",
@@ -1396,8 +2064,45 @@
       "ExaSearchBot"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "obeys",
+          "url": "https://crawler.exa.ai/",
+          "retrieved": "2026-11-17",
+          "note": "\"ExaSearchBot respects the Robots Exclusion Protocol. When choosing which rules to follow, it looks for a group addressed to ExaSearchBot. If you haven't provided one, it follows the rules you've set for major search engines; otherwise it follows the * group.\" (Page read in a browser; curl TLS handshake failed.)",
+          "source": "operator-docs"
+        }
+      ],
+      "recognition": [
+        {
+          "value": "Web Bot Auth signature, key directory https://crawler.exa.ai/.well-known/http-message-signatures-directory (no IP list)",
+          "url": "https://crawler.exa.ai/",
+          "retrieved": "2026-11-17",
+          "note": "\"User-agent strings can be spoofed, so don't trust the string alone — verify cryptographically (below).\" ... \"Because verification is cryptographic, it holds regardless of the request's IP address.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "signs with Web Bot Auth (HTTP Message Signatures, RFC 9421, Ed25519 keys)",
+          "url": "https://crawler.exa.ai/",
+          "retrieved": "2026-11-17",
+          "note": "\"Every ExaSearchBot request is cryptographically signed using HTTP Message Signatures (RFC 9421), following the Web Bot Auth scheme. Each request carries Signature, Signature-Input, and a Signature-Agent header identifying Exa.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt Disallow for ExaSearchBot; noindex meta tag or X-Robots-Tag to remove pages from the index",
+          "url": "https://crawler.exa.ai/",
+          "retrieved": "2026-11-17",
+          "note": "\"Block ExaSearchBot from your whole site: User-agent: ExaSearchBot Disallow: /\" ... \"robots.txt controls crawling, not indexing. To remove a page already in Exa's index, use a noindex robots meta tag or an X-Robots-Tag: noindex header\"",
+          "source": "operator-docs"
+        }
+      ]
+    }
   },
   "riverbot": {
     "name": "RiverBot",
@@ -1405,8 +2110,45 @@
       "RiverBot"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "obeys",
+          "url": "https://river.ai/bot",
+          "retrieved": "2026-11-17",
+          "note": "\"It always identifies itself, follows robots.txt, and keeps its pace on every site deliberately slow.\" Also: \"If that group says Content-Signal: ai-train=no ... or Content-Usage: train-ai=n ... RiverBot treats your whole site as disallowed.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "recognition": [
+        {
+          "value": "IP list https://river.ai/riverbot.json; forward-confirmed reverse DNS ending in .bot.river.ai",
+          "url": "https://river.ai/bot",
+          "retrieved": "2026-11-17",
+          "note": "\"The reverse DNS name of each ends in .bot.river.ai, such as crawl-3-212-178-146.bot.river.ai, and that name resolves back to the same address. A request that claims to be RiverBot from any other address isn't from us.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "signs with Web Bot Auth (HTTP Message Signatures; Signature-Agent \"https://river.ai\"; keys at https://river.ai/.well-known/http-message-signatures-directory)",
+          "url": "https://river.ai/bot",
+          "retrieved": "2026-11-17",
+          "note": "\"Every request is also signed with HTTP Message Signatures, as Web Bot Auth describes. Its Signature-Agent header is \"https://river.ai\", and the signature verifies against the public key in our key directory.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt Disallow for RiverBot; Content-Signal ai-train=no; email bot@river.ai",
+          "url": "https://river.ai/bot",
+          "retrieved": "2026-11-17",
+          "note": "\"To keep RiverBot off your whole site, add this to your robots.txt: User-agent: RiverBot Disallow: /\" ... \"Tell us which sites to leave alone and RiverBot will stop crawling them.\"",
+          "source": "operator-docs"
+        }
+      ]
+    }
   },
   "pandalytics": {
     "name": "Pandalytics",
@@ -1414,8 +2156,45 @@
       "Pandalytics"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "obeys",
+          "url": "https://domainsbot.com/network-crawler-pandalytics-kdc68dhsbd/",
+          "retrieved": "2026-11-17",
+          "note": "\"Requests /robots.txt first and only fetches the homepage if permitted for the Pandalytics token.\" ... \"Honours robots.txt (Disallow) and Crawl-delay.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "recognition": [
+        {
+          "value": "Web Bot Auth signature, key directory https://domainsbot.com/.well-known/http-message-signatures-directory; Cloudflare Verified Bot; no fixed IP list",
+          "url": "https://domainsbot.com/network-crawler-pandalytics-kdc68dhsbd/",
+          "retrieved": "2026-11-17",
+          "note": "\"Identity is proven by request signature, not a fixed IP list; egress IP addresses may vary.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "signs with Web Bot Auth (RFC 9421 HTTP Message Signatures, Ed25519; Signature-Agent \"https://domainsbot.com\")",
+          "url": "https://domainsbot.com/network-crawler-pandalytics-kdc68dhsbd/",
+          "retrieved": "2026-11-17",
+          "note": "\"Cloudflare Verified Bot via Web Bot Auth (RFC 9421 HTTP Message Signatures, Ed25519). Requests carry Signature, Signature-Input and Signature-Agent: \"https://domainsbot.com\" headers.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt Disallow / Crawl-delay for Pandalytics; or email crawler@domainsbot.com",
+          "url": "https://domainsbot.com/network-crawler-pandalytics-kdc68dhsbd/",
+          "retrieved": "2026-11-17",
+          "note": "\"To request a block, exclusion, or for any questions, email crawler@domainsbot.com — we respond to crawler opt-out requests.\"",
+          "source": "operator-docs"
+        }
+      ]
+    }
   },
   "anticlonebot": {
     "name": "AntiCloneBot",
@@ -1423,7 +2202,44 @@
       "AntiCloneBot"
     ],
     "cloudflare_slug": null,
-    "docs_recorded": false,
-    "claims": {}
+    "docs_recorded": true,
+    "claims": {
+      "robots_txt": [
+        {
+          "value": "obeys",
+          "url": "https://anticlone.de/bot",
+          "retrieved": "2026-11-17",
+          "note": "\"Honors robots.txt\" ... \"It honors robots.txt including Crawl-delay and slows down when a website answers 429 or 430.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "recognition": [
+        {
+          "value": "Web Bot Auth signature, public keys at https://anticlone.de/.well-known/http-message-signatures-directory; Cloudflare verified bot",
+          "url": "https://anticlone.de/bot",
+          "retrieved": "2026-11-17",
+          "note": "\"Signature The crawler's requests are signed with Web Bot Auth. Public keys https://anticlone.de/.well-known/http-message-signatures-directory\" ... \"Verified bot at Cloudflare\"",
+          "source": "operator-docs"
+        }
+      ],
+      "signing": [
+        {
+          "value": "signs with Web Bot Auth (key directory https://anticlone.de/.well-known/http-message-signatures-directory)",
+          "url": "https://anticlone.de/bot",
+          "retrieved": "2026-11-17",
+          "note": "\"The crawler's requests are signed with Web Bot Auth.\"",
+          "source": "operator-docs"
+        }
+      ],
+      "docs_opt_out": [
+        {
+          "value": "robots.txt Disallow for AntiCloneBot",
+          "url": "https://anticlone.de/bot",
+          "retrieved": "2026-11-17",
+          "note": "\"Add these two lines to your robots.txt. AntiCloneBot will no longer visit your website automatically. User-agent: AntiCloneBot Disallow: /\"",
+          "source": "operator-docs"
+        }
+      ]
+    }
   }
 }
