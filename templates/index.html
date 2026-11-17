@@ -651,8 +651,7 @@
   @media (max-width: 900px) {
     /* minmax(0, …): a bare 1fr never shrinks below its content's min width. */
     .main-grid { grid-template-columns: minmax(0, 1fr); }
-    .stats-row { grid-template-columns: 1fr; }
-    .stat-box  { border-right: none; border-bottom: 1px solid var(--border); }
+    .stat-box { padding: 1.5rem; }
     header, .hero, .panel, .feed-panel, .discovery-section, footer { padding-left: 1.5rem; padding-right: 1.5rem; }
     /* Logo, theme toggle and status need ~300px; below that, wrap instead of overflow. */
     header { flex-wrap: wrap; gap: 0.75rem 1rem; }
@@ -665,6 +664,13 @@
      the verdict and every count. Each row becomes a card instead, with the
      count labels moved from the (visually hidden) header into the cells. */
   @media (max-width: 600px) {
+    /* Side by side rather than stacked: stacked, the three numbers filled the
+       whole first screen and pushed the scoreboard below the fold. */
+    .stat-box { padding: 1rem 0.75rem; display: flex; flex-direction: column; justify-content: space-between; }
+    .stat-box:first-child { padding-left: 1.5rem; }
+    .stat-box:last-child { padding-right: 1.5rem; }
+    .stat-label { font-size: 0.6rem; letter-spacing: 0.06em; }
+    .stat-value { font-size: 1.6rem; }
     .scoreboard thead {
       position: absolute; width: 1px; height: 1px; overflow: hidden;
       clip: rect(0, 0, 0, 0); white-space: nowrap;
