@@ -103,6 +103,20 @@ async def main() -> int:
         await v.verdict(f"10.0.0.{i}", "gptbot")
     check("the cache stays bounded", len(v._cache) <= 2, True)
 
+    # 429s are counted and reported at most once per interval, so a crawler
+    # flood shows up in the log without filling it.
+    v, client = fresh({"/v1/bots": (200, BOTS), "/v1/verify": (429, {})})
+    warnings = []
+    v._warn = warnings.append
+    for i in range(5):
+        await v.verdict(f"10.1.0.{i}", "gptbot")
+    check("the first 429 is reported at once", len(warnings), 1)
+    check("the report names the rate limit", "rate limit" in warnings[0], True)
+    v._limited_reported_at -= botverify.RATE_LIMIT_REPORT_S
+    await v.verdict("10.1.0.9", "gptbot")
+    check("later 429s are reported after the interval, with their count",
+          (len(warnings), "5" in warnings[-1]), (2, True))
+
     print(f"\n{total - failures}/{total} checks passed")
     return 1 if failures else 0
 

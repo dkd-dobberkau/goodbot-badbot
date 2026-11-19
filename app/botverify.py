@@ -24,6 +24,10 @@ CACHE_TTL_S = 15 * 60
 BOTS_TTL_S = 6 * 3600
 BOTS_RETRY_S = 5 * 60
 RESULTS = frozenset({"confirmed", "refuted", "not_checkable"})
+# All of this site's calls share one bucket at bot-verify. A 429 is reported
+# at most this often, with the count since the last report, so a flood shows
+# in the log without filling it.
+RATE_LIMIT_REPORT_S = 60
 
 # goodbot-badbot keys whose bot-verify id differs. Every other key is used as
 # is when bot-verify lists it.
@@ -39,6 +43,9 @@ class Verifier:
         self._bots_retry_at = 0.0
         self._cache: dict[tuple[str, str], tuple[float, str]] = {}
         self.max_cache_entries = 10_000
+        self._limited = 0
+        self._limited_reported_at = float("-inf")
+        self._warn = log.warning
 
     def _http(self):
         if self._client is None:
@@ -74,6 +81,8 @@ class Verifier:
             return cached[1]
         try:
             resp = await self._http().get(f"{self.base_url}/v1/verify", params={"ip": ip, "bot": bot_id})
+            if resp.status_code == 429:
+                self._rate_limited(now)
             result = resp.json().get("result") if resp.status_code == 200 else None
         except Exception as exc:
             log.warning("bot-verify unavailable: %s", type(exc).__name__)
@@ -84,6 +93,14 @@ class Verifier:
             self._evict(now)
         self._cache[key] = (now + CACHE_TTL_S, result)
         return result
+
+    def _rate_limited(self, now: float):
+        self._limited += 1
+        if now - self._limited_reported_at >= RATE_LIMIT_REPORT_S:
+            self._warn(f"bot-verify rate limit reached: {self._limited} lookups without an answer "
+                       f"since the last report")
+            self._limited = 0
+            self._limited_reported_at = now
 
     def _evict(self, now: float):
         for key in [k for k, (until, _) in self._cache.items() if until <= now]:
