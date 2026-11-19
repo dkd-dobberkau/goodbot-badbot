@@ -58,6 +58,11 @@ pattern falls out:
 - **Web Bot Auth** — a way to prove your identity when you crawl. **Zero
   verified requests in 51 days.**
 
+> **Correction, 19 November 2026:** zero was our verifier, not the crawlers.
+> AhrefsBot had been signing every request since 12 June, and our verifier
+> rejected all of them. Since a fix on 17 November, AhrefsBot's signatures
+> verify. See [Zero verified — our bug, not theirs](/blog/zero-verified).
+
 The one that gets used is the one with immediate payoff. The two that sit at
 zero are pure infrastructure: valuable *if* an ecosystem grows up around them,
 worthless until it does. That is not a failure of the features — it is a

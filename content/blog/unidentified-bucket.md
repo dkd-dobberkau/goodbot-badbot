@@ -158,6 +158,10 @@ It is registered now. There are certainly others.
   GPTBot. This moves the resolution from one bucket to five; it does not solve
   identity. [Web Bot Auth](/blog/good-bot-bad-bot) is the thing that would, and
   it still sits at zero verified requests.
+
+  > **Correction, 19 November 2026:** it sat at zero because our verifier
+  > rejected every signature, AhrefsBot's included. Since 17 November they
+  > verify. See [Zero verified — our bug, not theirs](/blog/zero-verified).
 - **"Non-AI crawler" is a claim too.** SeznamBot and AhrefsBot are counted as
   what they say they are.
 - **27 reads is a smaller thermometer than 136.** Every hedge in the July post

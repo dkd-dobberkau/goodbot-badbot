@@ -103,6 +103,10 @@ request, [Web Bot Auth](/blog/good-bot-bad-bot). As of today no request to
 this site has been verified with it. A separate post will explain why that
 number is lower than it should be.
 
+> **Update, 19 November 2026:** that post is [Zero verified — our bug, not
+> theirs](/blog/zero-verified). Since 17 November, AhrefsBot's signatures
+> verify.
+
 ## The bigger number is untouched
 
 The rule only reaches visits that carry a known crawler's name. The other
