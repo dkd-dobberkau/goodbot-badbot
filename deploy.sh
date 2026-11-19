@@ -100,11 +100,20 @@ wait_for_version() {
   return 1
 }
 
+# The project also holds bot-verify's stack, so the web container is picked
+# by stack and service name, never by its position in the list.
+web_container_id() {
+  mw container list --project-id "${PROJECT_ID}" --output json \
+    | python3 -c 'import sys, json
+ids = [c["shortId"] for c in json.load(sys.stdin)
+       if c["stackId"] == sys.argv[1] and c["serviceName"] == "web"]
+print(ids[0] if ids else "")' "${STACK_ID}"
+}
+
 echo "  waiting for /api/version to report ${TAG}..."
 LIVE_VERSION="$(wait_for_version "${TAG}" 30)" || {
   echo "  /api/version reports '${LIVE_VERSION:-<empty>}', expected '${TAG}'; forcing recreate"
-  CID=$(mw container list --project-id "${PROJECT_ID}" --output json \
-    | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["shortId"])')
+  CID="$(web_container_id)"
   for attempt in 1 2 3; do
     if mw container recreate "${CID}" --project-id "${PROJECT_ID}" --force; then
       break
@@ -132,8 +141,7 @@ done
 if [[ "${HTTP}" != "200" ]]; then
   echo "FAIL: ${HEALTH_URL} returned HTTP ${HTTP} after 36s of retries"
   echo "Recent container logs:"
-  CID_FOR_LOGS=$(mw container list --project-id "${PROJECT_ID}" --output json \
-    | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["shortId"])')
+  CID_FOR_LOGS="$(web_container_id)"
   mw container logs "${CID_FOR_LOGS}" --project-id "${PROJECT_ID}" --tail 30 || true
   exit 1
 fi
