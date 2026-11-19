@@ -838,9 +838,14 @@
     as spoofing.
   </p>
   <p class="discovery-intro">
-    The filter only catches rotation. A client that sticks to one borrowed
-    name looks exactly like the real crawler and stays on the scoreboard; only
-    a verified Web Bot Auth signature can tell the two apart.
+    Rotation is one sign. The other: the bot's operator publishes where its
+    crawler comes from, and
+    <a href="https://verify.goodbot-badbot.com/">verify.goodbot-badbot.com</a>
+    finds the address is not among them (✕ in the IP check column). Those
+    hits are set aside too, even from a client that sticks to one borrowed
+    name; they are counted above but not listed as bursts. A client whose
+    claim cannot be checked still looks exactly like the real crawler; only a
+    verified Web Bot Auth signature tells the two apart.
   </p>
   <div class="table-scroll" tabindex="0" role="region" aria-labelledby="spoof-title">
     <table aria-labelledby="spoof-title">

@@ -11,8 +11,8 @@ not bot name, because one operator may legitimately run several crawlers
 from shared infrastructure (GPTBot and OAI-SearchBot are both OpenAI).
 
 The rule only catches rotation. A client that sticks to a single borrowed
-name is indistinguishable from the real bot here; only Web Bot Auth can
-tell those apart.
+name is caught when bot-verify refutes its IP for that bot (visits.ip_verdict,
+see refuted_visit_ids); otherwise only Web Bot Auth can tell it apart.
 """
 from __future__ import annotations
 
@@ -58,6 +58,12 @@ def find_spoofed_visit_ids(
                     spoofed.add(earlier["id"])
                     spoofed.add(visit["id"])
     return spoofed
+
+
+def refuted_visit_ids(visits: Iterable[dict[str, Any]]) -> set[int]:
+    """Ids of visits whose IP bot-verify refuted for the bot they named: the
+    operator publishes where its bot comes from, and this was not there."""
+    return {visit["id"] for visit in visits if visit.get("ip_verdict") == "refuted"}
 
 
 def group_spoof_bursts(

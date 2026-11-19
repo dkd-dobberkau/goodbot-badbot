@@ -149,8 +149,10 @@ TOOLS: list[dict[str, Any]] = [
             "(good_bot = zero violations, bad_bot = one or more). Sorted by "
             "violations descending. Violations exclude spoofed_hits: honeypot "
             "hits made under the bot's name by a client that claimed bots of "
-            "another operator from the same address within 60 seconds. A client "
-            "that only ever borrows one name is not detected."
+            "another operator from the same address within 60 seconds, or from "
+            "an IP that verify.goodbot-badbot.com refutes for that bot "
+            "(ip_refuted). A client that borrows one name and cannot be checked "
+            "is not detected."
         ),
         "inputSchema": {
             "type": "object",

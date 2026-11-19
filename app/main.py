@@ -1593,14 +1593,18 @@ async def _compute_stats() -> dict:
             # window), so User-Agent rotation is detected in Python rather
             # than with a self-join: see app/spoofing.py for the rule.
             await cur.execute("""
-                SELECT id, ts, ip_hash, bot_name, operator, path, is_honeypot
+                SELECT id, ts, ip_hash, bot_name, operator, path, is_honeypot, ip_verdict
                 FROM visits
                 WHERE bot_name IS NOT NULL AND ip_hash IS NOT NULL
             """)
             named_visits = await cur.fetchall()
-            spoofed_ids = spoofing.find_spoofed_visit_ids(named_visits)
+            # Two kinds of evidence that a name was borrowed: rotation across
+            # operators, and an IP that bot-verify refutes for the bot. Both
+            # keep hits off the named bot; the burst list shows rotation only.
+            rotation_ids = spoofing.find_spoofed_visit_ids(named_visits)
+            spoofed_ids = rotation_ids | spoofing.refuted_visit_ids(named_visits)
             summary = spoofing.attributed_summary(summary, named_visits, spoofed_ids)
-            spoof_bursts = spoofing.group_spoof_bursts(named_visits, spoofed_ids)
+            spoof_bursts = spoofing.group_spoof_bursts(named_visits, rotation_ids)
             spoofed_hit_ids = sorted(
                 visit["id"] for visit in named_visits
                 if visit["id"] in spoofed_ids and visit["is_honeypot"]

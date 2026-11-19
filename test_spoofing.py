@@ -8,7 +8,7 @@ Exit 0 if all assertions pass, 1 otherwise.
 import sys
 from datetime import datetime, timedelta
 
-from app.spoofing import attributed_summary, find_spoofed_visit_ids, group_spoof_bursts
+from app.spoofing import attributed_summary, find_spoofed_visit_ids, group_spoof_bursts, refuted_visit_ids
 
 OPERATORS = {
     "ClaudeBot": "Anthropic", "ChatGPT-User": "OpenAI", "GPTBot": "OpenAI",
@@ -104,6 +104,23 @@ def main() -> int:
                                            by_name["PetalBot"]["spoofed_hits"]), (6, 1))
     check("re-sorted by cleaned violations",
           [row["bot_name"] for row in attributed], ["PetalBot", "GPTBot", "ClaudeBot"])
+
+    # bot-verify: an IP the bot's operator rules out is a borrowed name, even
+    # when the client sticks to that one name, which rotation cannot catch.
+    def verdict(v, result):
+        return {**v, "ip_verdict": result}
+
+    lone = [verdict(visit(0, "jjjj", "GPTBot"), "refuted"),
+            verdict(visit(5, "jjjj", "GPTBot", honeypot=False, path="/robots.txt"), "refuted"),
+            verdict(visit(0, "kkkk", "GPTBot"), "confirmed"),
+            verdict(visit(0, "llll", "GPTBot"), "not_checkable"),
+            visit(0, "mmmm", "GPTBot")]
+    check("refuted visits are spoofed, whatever else",
+          refuted_visit_ids(lone), {lone[0]["id"], lone[1]["id"]})
+    gpt_only = [{"bot_name": "GPTBot", "operator": "OpenAI", "violations": 4, "total_visits": 5}]
+    by_name = {row["bot_name"]: row for row in attributed_summary(gpt_only, lone, refuted_visit_ids(lone))}
+    check("a refuted honeypot hit is not charged to the named bot",
+          (by_name["GPTBot"]["violations"], by_name["GPTBot"]["spoofed_hits"]), (3, 1))
 
     print(f"\n{total - failures}/{total} passed")
     return 0 if failures == 0 else 1
