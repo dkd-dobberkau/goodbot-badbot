@@ -1,6 +1,6 @@
 ---
 title: How a crawler signs a request — and what that proves
-date: 2026-11-XX
+date: 2026-11-19
 summary: A User-Agent string is a claim anyone can type. Web Bot Auth replaces it with a signature: the crawler signs each request with a private key and says where its public keys live, and the site checks one against the other. This is how that works, which standard it rests on, and — the part most write-ups skip — exactly how little a valid signature proves.
 ---
 
@@ -9,8 +9,9 @@ honeypot statistic on the dashboard is grouped by it. That is a weak
 foundation, and we know it. A User-Agent is a string the client picks.
 Typing `ClaudeBot` costs nothing, and the log is full of clients that try
 several names in a row: one address announcing itself as ClaudeBot,
-ChatGPT-User, GPTBot and PerplexityBot within four seconds. A
-[follow-up post](/blog) looks at that pattern in the honeypot data.
+ChatGPT-User, GPTBot and PerplexityBot within four seconds. [The bots in
+the trap weren't the bots](/blog/the-bots-in-the-trap) looks at that pattern
+in the honeypot data.
 
 [Web Bot Auth](https://datatracker.ietf.org/wg/webbotauth/about/) is the
 attempt to replace that claim with something checkable. This post explains
@@ -73,14 +74,15 @@ The working-group draft fixes a profile on top of RFC 9421:
   signature is bound to this site and cannot be replayed against another.
 - **A `Signature-Agent` header** says where the public keys are: an `https`
   URL that serves a JSON Web Key Set, by convention at
-  `/.well-known/http-message-signatures-directory`. The member of that
-  header that belongs to the signature must itself be covered by the
-  signature.
+  `/.well-known/http-message-signatures-directory`. The value is the URL of
+  that directory itself, which the verifier fetches as given (§5.5). The
+  member of that header that belongs to the signature must itself be
+  covered by the signature.
 
 ## The header that changed shape
 
-`Signature-Agent` is where we got caught. Early drafts defined it as a bare
-string:
+`Signature-Agent` is where we got caught, twice. Early drafts defined it as
+a bare string:
 
 ```
 Signature-Agent: "https://crawler.example/…"
@@ -98,8 +100,34 @@ The two forms differ by a few characters on the wire, and a verifier that
 expects one cannot read the other. The draft allows verifiers to keep
 accepting the old form during the transition, but signers must send the
 new one. A verifier written against an earlier draft rejects every
-up-to-date signer. That is what happened here, and [the correction](/blog)
-has the numbers.
+up-to-date signer. Ours was, and did.
+
+In practice, the transition is slow. AhrefsBot, the most frequent signer
+here, still sends the old form.
+
+## A website is not a key directory
+
+The second trap is the value. AhrefsBot sends
+
+```
+Signature-Agent: "https://ahrefs.com"
+```
+
+and ibou sends `https://ibou.io`. Both are the address of a website, not
+of a key directory, and fetched as given, as the draft says, they return a
+homepage. Their keys are where convention puts them, at
+`/.well-known/http-message-signatures-directory` under that address, but
+nothing in the header says so. The two crawlers are in good company: the
+example in the earlier directory draft
+([draft-meunier-http-message-signatures-directory-05](https://datatracker.ietf.org/doc/draft-meunier-http-message-signatures-directory/05/),
+Appendix A.3) uses a bare address too, and that draft never says whether
+the value names the directory or the site.
+
+So a verifier that follows the text rejects signers that follow the
+example. Until 17 November, ours did, and every AhrefsBot signature failed.
+[Zero verified — our bug, not theirs](/blog/zero-verified) has the numbers
+and the four faults it took to get to the first verified AhrefsBot
+request.
 
 ## What a valid signature proves
 
@@ -143,8 +171,11 @@ the site:
 
 1. requires that it covers `@authority` or `@target-uri`, plus the
    `Signature-Agent` member keyed to that label;
-2. takes the directory URL from *that* member only, ignoring members with
-   parameters and anything that is not `https`;
+2. takes the directory URL from *that* member only, or from the old
+   single-string form, ignoring members with parameters and anything that
+   is not `https`. An address with no path, or only `/`, is read as its
+   well-known directory. That goes beyond the draft, which says to fetch
+   the value as given, and is there for the signers described above;
 3. fetches that directory (cached for an hour) and finds the key by `kid`
    or, failing that, by its thumbprint;
 4. rebuilds the signature base and verifies it, with an age limit of one
@@ -155,16 +186,13 @@ request was signed but none did, and with no status if it was unsigned.
 The site does not block or favour anyone based on the result. As with
 robots.txt, the point is to measure, not to enforce.
 
-<!-- TODO before publishing:
-     - Fill in date, and the two /blog links (spoofing post, correction post).
-     - If we start storing the verifying URL, say so here: it is what makes
-       "verified" an identifier rather than a checkbox. -->
-
 ## Sources and further reading
 
 - [RFC 9421 — HTTP Message Signatures](https://www.rfc-editor.org/rfc/rfc9421.html), the signing mechanism.
 - [draft-ietf-webbotauth-httpsig-protocol-01](https://datatracker.ietf.org/doc/draft-ietf-webbotauth-httpsig-protocol/), the Web Bot Auth protocol: `Signature-Agent`, key directory, well-known URI.
 - [IETF Web Bot Auth working group](https://datatracker.ietf.org/wg/webbotauth/about/), charter, mailing list and documents.
 - [RFC 7638 — JWK Thumbprint](https://www.rfc-editor.org/rfc/rfc7638.html), how `keyid` is derived from the key.
-- [RFC 9651 — Structured Field Values for HTTP](https://www.rfc-editor.org/rfc/rfc9651.html), the string-versus-dictionary distinction that broke our verifier.
+- [RFC 9651 — Structured Field Values for HTTP](https://www.rfc-editor.org/rfc/rfc9651.html), the string-versus-dictionary distinction behind the header's change of shape.
+- [draft-meunier-http-message-signatures-directory-05](https://datatracker.ietf.org/doc/draft-meunier-http-message-signatures-directory/05/), Appendix A.3, the example with a bare address.
+- [Zero verified — our bug, not theirs](/blog/zero-verified), what went wrong in this site's verifier.
 - [Good bot, bad bot](/blog/good-bot-bad-bot), how the site measures in the first place.
