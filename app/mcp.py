@@ -193,6 +193,8 @@ TOOLS: list[dict[str, Any]] = [
                             "violations": {"type": "integer"},
                             "spoofed_hits": {"type": "integer"},
                             "verified_visits": {"type": "integer"},
+                            "ip_confirmed": {"type": "integer"},
+                            "ip_refuted": {"type": "integer"},
                             "last_seen": {"type": ["string", "null"]},
                         },
                         "required": ["bot_name", "verdict", "violations"],
@@ -348,6 +350,8 @@ def _row_to_bot(row: dict[str, Any]) -> dict[str, Any]:
         "violations": violations,
         "spoofed_hits": int(row.get("spoofed_hits") or 0),
         "verified_visits": int(row.get("verified_visits") or 0),
+        "ip_confirmed": int(row.get("ip_confirmed") or 0),
+        "ip_refuted": int(row.get("ip_refuted") or 0),
         "last_seen": _iso(row.get("last_seen")),
     }
 

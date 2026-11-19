@@ -29,7 +29,7 @@ from http_message_signatures import (
     algorithms,
 )
 
-from app import blog, catalog, facts, legal, mcp, spoofing
+from app import blog, botverify, catalog, facts, legal, mcp, spoofing
 
 # The UA taxonomy lives in app.bots. identify_bot and KNOWN_BOTS are re-exported
 # here because both are part of this module's established import surface.
@@ -195,6 +195,7 @@ CREATE TABLE IF NOT EXISTS visits (
     is_honeypot      TINYINT(1) NOT NULL DEFAULT 0,
     signature_status VARCHAR(16) NULL,
     method           VARCHAR(8) NULL,
+    ip_verdict       VARCHAR(16) NULL,
     KEY idx_visits_bot_name (bot_name),
     KEY idx_visits_is_honeypot_ts (is_honeypot, ts)
 ) ENGINE=InnoDB CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
@@ -207,6 +208,7 @@ CREATE TABLE IF NOT EXISTS visits (
 ADDED_COLUMNS = (
     ("signature_status", "ALTER TABLE visits ADD COLUMN signature_status VARCHAR(16) NULL"),
     ("method", "ALTER TABLE visits ADD COLUMN method VARCHAR(8) NULL"),
+    ("ip_verdict", "ALTER TABLE visits ADD COLUMN ip_verdict VARCHAR(16) NULL"),
 )
 
 
@@ -255,6 +257,30 @@ async def log_visit(
                 (ts, path, user_agent, bot_key, bot_name, operator, ip_hash, int(is_honeypot),
                  signature_status, method),
             )
+            visit_id = cur.lastrowid
+    if bot_key:
+        # The IP is only in memory now, so bot-verify is asked now, but
+        # after the response path: the row gets its answer a moment later.
+        task = asyncio.create_task(_record_ip_verdict(pool, visit_id, ip, bot_key))
+        _verdict_tasks.add(task)
+        task.add_done_callback(_verdict_tasks.discard)
+
+
+# Running verdict lookups; held so they are not garbage-collected mid-flight.
+_verdict_tasks: set[asyncio.Task] = set()
+
+
+async def _record_ip_verdict(pool, visit_id: int, ip: str, bot_key: str):
+    """Store bot-verify's answer for the visit's IP and named bot, if any."""
+    try:
+        verdict = await botverify.verifier.verdict(ip, bot_key)
+        if verdict is None:
+            return
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute("UPDATE visits SET ip_verdict = %s WHERE id = %s", (verdict, visit_id))
+    except Exception:
+        logging.getLogger(__name__).exception("storing the IP verdict failed")
 
 
 # Dedup meta-visits (robots.txt, sitemap.xml) per (path, method, bot-identity)
@@ -1553,6 +1579,8 @@ async def _compute_stats() -> dict:
                        CAST(SUM(is_honeypot) AS UNSIGNED) AS violations,
                        CAST(SUM(signature_status = 'verified') AS UNSIGNED) AS verified_visits,
                        CAST(SUM(signature_status = 'failed') AS UNSIGNED) AS failed_sigs,
+                       CAST(SUM(ip_verdict = 'confirmed') AS UNSIGNED) AS ip_confirmed,
+                       CAST(SUM(ip_verdict = 'refuted') AS UNSIGNED) AS ip_refuted,
                        MAX(ts) AS last_seen
                 FROM visits
                 WHERE bot_name IS NOT NULL

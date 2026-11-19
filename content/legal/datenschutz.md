@@ -46,7 +46,16 @@ speichert die Anwendung zu jedem Aufruf einen Datensatz mit folgenden Feldern:
 - Daraus abgeleitete Bot-Kennung, Bot-Name und Betreiber, sofern erkennbar
 - Kennzeichen, ob ein als gesperrt markierter Pfad abgerufen wurde
 - Ergebnis der Signaturprüfung nach Web Bot Auth, sofern vorhanden
+- Ergebnis der IP-Prüfung (bestätigt, widerlegt oder nicht prüfbar), sofern
+  der User-Agent einen Bot nennt, den unser Prüfdienst kennt
 - Ein Hashwert der IP-Adresse
+
+**Zur IP-Prüfung:** Nennt der User-Agent einen solchen Bot, fragt die
+Anwendung unseren Prüfdienst verify.goodbot-badbot.com (Abschnitt 8), ob die
+IP-Adresse zu diesem Bot gehört. Dafür wird die IP-Adresse im Klartext an den
+Prüfdienst übermittelt; er speichert sie nicht. Gespeichert wird nur das
+Ergebnis. Die Anwendung hält Ergebnisse bis zu 15 Minuten im Arbeitsspeicher,
+um dieselbe Frage nicht mehrfach zu stellen.
 
 **Zur IP-Adresse:** Die IP-Adresse wird nicht gespeichert. Gespeichert wird
 ausschließlich ein mit einem geheimen Salt gebildeter SHA-256-Hashwert, gekürzt

@@ -647,6 +647,8 @@
     white-space: nowrap;
   }
   .signed-cell.has-verified { color: var(--green); }
+  .ip-confirmed { color: var(--green); }
+  .ip-refuted { color: var(--red); }
 
   @media (max-width: 900px) {
     /* minmax(0, …): a bare 1fr never shrinks below its content's min width. */
@@ -765,13 +767,14 @@
             <th scope="col">Operator</th>
             <th scope="col">Verdict</th>
             <th scope="col" style="text-align:right">Signed</th>
+            <th scope="col" style="text-align:right" title="Visits whose IP the bot's operator confirms (✓) or that it rules out (✕), checked with verify.goodbot-badbot.com">IP check</th>
             <th scope="col" style="text-align:right">Violations</th>
             <th scope="col" style="text-align:right">Spoofed</th>
             <th scope="col" style="text-align:right">Visits</th>
           </tr>
         </thead>
         <tbody id="botTable">
-          <tr><td colspan="7" class="empty-state">Loading…</td></tr>
+          <tr><td colspan="8" class="empty-state">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -1040,7 +1043,7 @@ function renderStats(data) {
 
   const tbody = document.getElementById('botTable');
   if (data.summary.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No bots observed yet — waiting for crawlers.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state">No bots observed yet — waiting for crawlers.</td></tr>`;
   } else {
     tbody.innerHTML = data.summary.map(row => {
       const isBad = row.violations > 0;
@@ -1052,11 +1055,18 @@ function renderStats(data) {
       const signedCell = verified > 0
         ? `<td class="signed-cell has-verified" data-label="Signed">${verified}/${total}</td>`
         : `<td class="signed-cell" data-label="Signed">—</td>`;
+      const ipConfirmed = Number(row.ip_confirmed) || 0;
+      const ipRefuted = Number(row.ip_refuted) || 0;
+      const ipParts = [];
+      if (ipConfirmed) ipParts.push(`<span class="ip-confirmed">${ipConfirmed}✓</span>`);
+      if (ipRefuted) ipParts.push(`<span class="ip-refuted">${ipRefuted}✕</span>`);
+      const ipCell = `<td class="signed-cell" data-label="IP check">${ipParts.join(' ') || '—'}</td>`;
       return `<tr>
         <td><span class="bot-name">${esc(row.bot_name)}</span></td>
         <td><span class="operator">${esc(row.operator)}</span></td>
         <td>${verdict}</td>
         ${signedCell}
+        ${ipCell}
         <td class="count ${isBad ? 'nonzero' : ''}" data-label="Violations">${row.violations}</td>
         <td class="count" data-label="Spoofed">${Number(row.spoofed_hits) || '—'}</td>
         <td class="count" data-label="Visits">${total}</td>
