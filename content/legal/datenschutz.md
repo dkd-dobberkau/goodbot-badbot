@@ -2,7 +2,7 @@
 title: Datenschutzerklärung
 ---
 
-Informationen nach Art. 13 DSGVO. Stand: September 2026.
+Informationen nach Art. 13 DSGVO. Stand: November 2026.
 
 **Kurzfassung:** Diese Seite untersucht das Verhalten automatisierter Clients.
 Dazu wird zu jedem Aufruf ein Datensatz gespeichert, der die IP-Adresse
@@ -85,7 +85,35 @@ Die dafür nötige IP-Adresse wird ausschließlich im Arbeitsspeicher gehalten,
 nicht gespeichert und geht beim Neustart verloren. Rechtsgrundlage ist Art. 6
 Abs. 1 lit. f DSGVO.
 
-## 8. Lokale Speicherung im Browser
+## 8. Prüfdienst verify.goodbot-badbot.com
+
+Unter verify.goodbot-badbot.com betreiben wir zusätzlich den Prüfdienst
+bot-verify. Er beantwortet die Frage, ob eine IP-Adresse zu einem bestimmten
+Bot gehört, anhand der Angaben, die dessen Betreiber selbst veröffentlicht
+(IP-Listen oder Reverse-DNS-Domains). Der Dienst läuft ebenfalls bei der
+Mittwald CM Service GmbH & Co. KG; für die Server-Logfiles des Hosters gilt
+Abschnitt 3.
+
+- **Abgefragte IP-Adresse:** Die IP-Adresse, nach der gefragt wird, verarbeitet
+  der Dienst nur, um die Antwort zu bilden. Sie wird nicht gespeichert und
+  nicht protokolliert. Für die Reverse-DNS-Prüfung wird sie in Form einer
+  DNS-Anfrage an DNS-Server übermittelt; das Ergebnis dieser
+  Prüfung wird bis zu 15 Minuten im Arbeitsspeicher zwischengespeichert.
+- **IP-Adresse des aufrufenden Clients:** Die Anwendung speichert und
+  protokolliert sie nicht. Ihr Protokoll enthält je Aufruf nur Methode, Pfad,
+  Statuscode und Dauer.
+- **Rate Limiting:** Zum Schutz vor Überlastung wird die Aufrufhäufigkeit je
+  Netz des Absenders (IPv4 /24, IPv6 /56) begrenzt. Dafür wird die
+  Netzadresse ausschließlich im Arbeitsspeicher gehalten, nicht gespeichert,
+  und geht spätestens beim Neustart verloren.
+- Der Prüfdienst setzt keine Cookies, nutzt keinen lokalen Speicher im Browser
+  und bindet keine externen Ressourcen ein.
+
+Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO. Das berechtigte Interesse liegt
+darin, Website-Betreibern die Prüfung von Bot-Angaben zu ermöglichen und den
+Dienst vor Überlastung zu schützen.
+
+## 9. Lokale Speicherung im Browser
 
 Die Seite speichert Ihre Auswahl zwischen heller und dunkler Darstellung im
 `localStorage` Ihres Browsers unter dem Schlüssel `theme`. Dieser Wert verlässt
@@ -98,20 +126,20 @@ Darüber hinaus werden keine Cookies gesetzt und keine Analyse-,
 Reichweitenmessungs- oder Trackingdienste eingesetzt. Es findet keine
 Profilbildung und keine automatisierte Entscheidungsfindung statt.
 
-## 9. Schriftarten und externe Ressourcen
+## 10. Schriftarten und externe Ressourcen
 
 Alle Schriftarten und Stylesheets werden von diesem Server ausgeliefert. Es
 besteht keine Verbindung zu Google Fonts oder einem anderen externen Anbieter.
 Die Seiten binden keine Ressourcen von Drittservern ein.
 
-## 10. Externe Links
+## 11. Externe Links
 
 Diese Seiten verlinken auf externe Websites, etwa das Quellcode-Repository bei
 GitHub. Auf deren Datenverarbeitung haben wir keinen Einfluss; es gelten die
 dortigen Datenschutzerklärungen. Beim Verlassen der Seite wird die
 Referrer-Information nicht mitgesendet (`Referrer-Policy: no-referrer`).
 
-## 11. Ihre Rechte
+## 12. Ihre Rechte
 
 Sie haben jederzeit das Recht auf Auskunft (Art. 15 DSGVO), Berichtigung
 (Art. 16), Löschung (Art. 17), Einschränkung der Verarbeitung (Art. 18),
@@ -126,7 +154,7 @@ nicht verpflichtet. Teilen Sie uns Ihre IP-Adresse und den ungefähren Zeitraum
 mit, können wir gezielt suchen und die betreffenden Datensätze auf Wunsch
 löschen.
 
-## 12. Beschwerderecht
+## 13. Beschwerderecht
 
 Sie haben das Recht, sich bei einer Datenschutz-Aufsichtsbehörde zu beschweren
 (Art. 77 DSGVO). Für uns zuständig ist der Hessische Beauftragte für Datenschutz
