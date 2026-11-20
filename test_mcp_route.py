@@ -119,6 +119,9 @@ def main_() -> int:
 
     # Announced where it should be...
     r = client.get("/.well-known/ai-catalog.json", headers={"User-Agent": "probe/1"})
+    check("ARD manifest uses the AI Catalog media type",
+          r.headers["content-type"].startswith("application/ai-catalog+json"),
+          r.headers["content-type"])
     check("ARD manifest carries the MCP entry",
           r.status_code == 200
           and len(r.json()["entries"]) == 2
@@ -159,6 +162,8 @@ def main_() -> int:
     # ...and deliberately absent where it should not be, so "guessed the path"
     # stays a distinguishable case in the data.
     r = client.get("/", headers={"User-Agent": "probe/4"})
+    check("homepage Link header types the AI catalog correctly",
+          'rel="ai-catalog"; type="application/ai-catalog+json"' in r.headers.get("link", ""))
     check("homepage Link header omits /mcp",
           "/mcp" not in r.headers.get("link", ""), r.headers.get("link", ""))
 

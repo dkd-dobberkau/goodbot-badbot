@@ -118,6 +118,9 @@ API_CATALOG_PATHS = ("/.well-known/api-catalog", "/openapi.json")
 # registry crawlers are visible on this measurement site, rather than being
 # folded into catalog_reads. See dri.es "Agentic Resource Discovery".
 ARD_CATALOG_PATHS = ("/.well-known/ai-catalog.json",)
+# The AI Catalog spec's own media type (spec section "Media Type"); plain
+# application/json was what this site served before that was checked.
+AI_CATALOG_MEDIA_TYPE = "application/ai-catalog+json"
 
 # MCP endpoint. A fifth Discovery signal, and the only one that is an
 # *invocation* surface rather than a document: everything above is something an
@@ -920,7 +923,7 @@ async def ai_catalog(request: Request):
         )
     return JSONResponse(
         content=build_ai_catalog(SITE_BASE_URL),
-        media_type="application/json",
+        media_type=AI_CATALOG_MEDIA_TYPE,
         headers={"Cache-Control": "public, max-age=3600"},
     )
 
@@ -1865,7 +1868,7 @@ HOMEPAGE_LINK_HEADER = ", ".join((
     '</llms.txt>; rel="service-doc"; type="text/markdown"',
     '</facts>; rel="describedby"; type="text/html"',
     '</.well-known/api-catalog>; rel="api-catalog"; type="application/linkset+json"',
-    '</.well-known/ai-catalog.json>; rel="ai-catalog"; type="application/json"',
+    f'</.well-known/ai-catalog.json>; rel="ai-catalog"; type="{AI_CATALOG_MEDIA_TYPE}"',
     '</sitemap.xml>; rel="sitemap"',
 ))
 
