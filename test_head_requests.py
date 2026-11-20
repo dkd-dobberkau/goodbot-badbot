@@ -45,6 +45,7 @@ GET_PATHS = [
     "/.well-known/ai-catalog.json",
     "/.well-known/http-message-signatures-directory",
     "/openapi.json",
+    "/mcp/server-card",
     "/api/stats",
     "/api/version",
     "/favicon.ico",

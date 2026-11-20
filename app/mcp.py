@@ -36,7 +36,10 @@ from typing import Any, Callable
 PROTOCOL_VERSION = "2026-07-28"
 SUPPORTED_PROTOCOL_VERSIONS = (PROTOCOL_VERSION,)
 
-SERVER_INFO = {"name": "goodbot-badbot", "version": "1.0.0"}
+# Reverse-DNS name because the Server Card schema requires that form, and the
+# card's name SHOULD match what server/discover reports. `title` carries the
+# display name the plain "goodbot-badbot" used to be.
+SERVER_INFO = {"name": "com.goodbot-badbot/mcp", "title": "goodbot-badbot", "version": "1.0.0"}
 
 SERVER_INSTRUCTIONS = (
     "goodbot-badbot.com measures whether AI crawlers obey robots.txt. Six "
@@ -257,28 +260,42 @@ TOOLS: list[dict[str, Any]] = [
 TOOLS_BY_NAME = {tool["name"]: tool for tool in TOOLS}
 
 
-def build_server_card(endpoint_url: str) -> dict[str, Any]:
-    """MCP server card for embedding in the ARD manifest.
+SERVER_CARD_SCHEMA = "https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json"
+SERVER_CARD_MEDIA_TYPE = "application/mcp-server-card+json"
+# The schema caps description at 100 characters, so SERVER_INSTRUCTIONS cannot
+# double as it.
+SERVER_CARD_DESCRIPTION = (
+    "Read-only robots.txt compliance data for AI crawlers: a scoreboard and a per-crawler lookup."
+)
 
-    ARD entries carry either a `url` pointing at an artifact document or an
-    inline `data` object. `/mcp` is POST-only and serves no document, so the
-    card is inlined — the same shape the ARD spec's own MCP example uses,
-    plus the endpoint URL so a registry can pass it through to an agent.
-    Built from TOOLS so the advertised tool list cannot drift from the served
-    one.
+
+def build_server_card(endpoint_url: str) -> dict[str, Any]:
+    """MCP Server Card (SEP-2127, schema v1), served at /mcp/server-card and
+    inlined in the ARD manifest.
+
+    The card carries identity, transport and protocol versions only. SEP-2127
+    deliberately excludes tools and capabilities — they are runtime facts,
+    learned via tools/list and server/discover — so an earlier version that
+    listed TOOLS here was not a valid card. Identity fields come from
+    SERVER_INFO so the card cannot contradict server/discover.
     """
     return {
+        "$schema": SERVER_CARD_SCHEMA,
         "name": SERVER_INFO["name"],
-        "description": SERVER_INSTRUCTIONS,
-        "url": endpoint_url,
-        "protocolVersions": list(SUPPORTED_PROTOCOL_VERSIONS),
-        "tools": [
+        "version": SERVER_INFO["version"],
+        "title": SERVER_INFO["title"],
+        "description": SERVER_CARD_DESCRIPTION,
+        "websiteUrl": SITE_BASE_URL,
+        "repository": {
+            "url": "https://github.com/dkd-dobberkau/goodbot-badbot",
+            "source": "github",
+        },
+        "remotes": [
             {
-                "name": tool["name"],
-                "description": tool["description"],
-                "inputSchema": tool["inputSchema"],
+                "type": "streamable-http",
+                "url": endpoint_url,
+                "supportedProtocolVersions": list(SUPPORTED_PROTOCOL_VERSIONS),
             }
-            for tool in TOOLS
         ],
     }
 

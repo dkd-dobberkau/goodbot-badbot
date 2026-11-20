@@ -52,9 +52,8 @@ def main() -> int:
     check("queries are on-topic (robots.txt)",
           any("robots.txt" in q.lower() for q in queries))
 
-    # The MCP entry. /mcp is POST-only and serves no artifact document, so ARD
-    # requires the server card be inlined via `data` rather than linked by
-    # `url` — the two are mutually exclusive.
+    # The MCP entry inlines the Server Card via `data` (also served at
+    # /mcp/server-card); `url` and `data` are mutually exclusive.
     check("mcp identifier is a host-scoped URN",
           mcp_entry["identifier"] == "urn:air:goodbot-badbot.com:mcp")
     check("mcp entry uses the MCP server-card media type",
@@ -62,10 +61,10 @@ def main() -> int:
     check("mcp entry inlines the card via data", isinstance(mcp_entry.get("data"), dict))
     check("mcp entry has no url alongside data", "url" not in mcp_entry)
     check("mcp card points at the endpoint",
-          mcp_entry["data"]["url"] == base + "/mcp")
-    check("mcp card advertises tools",
-          [t["name"] for t in mcp_entry["data"]["tools"]]
-          == ["get_compliance_stats", "check_bot"])
+          mcp_entry["data"]["remotes"][0]["url"] == base + "/mcp")
+    # SEP-2127 keeps tools out of the card; the ARD entry's own capabilities
+    # list below is where registries find the tool names.
+    check("mcp card carries no tool list", "tools" not in mcp_entry["data"])
     check("mcp entry lists capabilities",
           mcp_entry.get("capabilities") == ["get_compliance_stats", "check_bot"])
     check("mcp entry has representativeQueries",

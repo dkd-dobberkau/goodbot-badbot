@@ -138,7 +138,13 @@ MCP_PATHS = ("/mcp",)
 # asks. Kept in its own column rather than folded into the ARD catalog: they
 # are two different manifests, and merging distinct surfaces into one number is
 # the exact mistake the Discovery Reads split was written to undo.
-MCP_MANIFEST_PATHS = ("/.well-known/mcp-server",)
+#
+# /mcp/server-card is the SEP-2127 Server Card, at the location that spec
+# reserves (`<streamable-http-url>/server-card`). Both documents answer the same
+# question — where is the MCP server, how do I connect — so they share the
+# column the way the three agents.md locations do, and are told apart by path
+# in a query.
+MCP_MANIFEST_PATHS = ("/.well-known/mcp-server", "/mcp/server-card")
 
 
 DB_CONFIG = {
@@ -878,11 +884,10 @@ def build_ai_catalog(base_url: str) -> dict:
                 ],
             },
             {
-                # The MCP endpoint is POST-only and serves no artifact
-                # document, so the server card is inlined via `data` rather
-                # than referenced by `url` — the shape the ARD spec's own MCP
-                # example uses. The card is generated from the same tool
-                # definitions the endpoint serves, so the two cannot drift.
+                # The card is also served at /mcp/server-card, but stays
+                # inlined via `data` (exactly one of `url`/`data` is allowed)
+                # so a registry gets it without a second fetch. Both are built
+                # by the same function, so the two cannot drift.
                 "identifier": f"urn:air:{host}:mcp",
                 "displayName": "goodbot-badbot MCP server",
                 "type": "application/mcp-server-card+json",
@@ -942,6 +947,49 @@ async def mcp_server_manifest(request: Request):
         media_type="application/json",
         headers={"Cache-Control": "public, max-age=3600"},
     )
+
+
+# SEP-2127 Server Card. The card only changes on deploy, so body and ETag are
+# computed once. CORS and caching headers are the ones the spec's discovery
+# document requires: the card is public read-only metadata, so `*` is safe.
+SERVER_CARD_BODY = json.dumps(
+    mcp.build_server_card(f"{SITE_BASE_URL}/mcp"), ensure_ascii=False, separators=(",", ":"),
+).encode("utf-8")
+SERVER_CARD_ETAG = '"' + hashlib.sha256(SERVER_CARD_BODY).hexdigest()[:16] + '"'
+SERVER_CARD_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET",
+    "Access-Control-Allow-Headers": "Content-Type, If-None-Match",
+    "Access-Control-Expose-Headers": "ETag",
+    "Cache-Control": "public, max-age=3600",
+    "ETag": SERVER_CARD_ETAG,
+}
+
+
+@app.get("/mcp/server-card", include_in_schema=False)
+async def mcp_server_card(request: Request):
+    ip = request.client.host
+    ua = request.headers.get("user-agent", "")
+    if _should_log_meta_visit("/mcp/server-card", ua, request.method):
+        await log_visit(
+            app.state.db_pool, "/mcp/server-card", ua, ip, is_honeypot=False,
+            signature_status=request.state.signature_status,
+            method=request.method,
+        )
+    if request.headers.get("if-none-match") == SERVER_CARD_ETAG:
+        return Response(status_code=304, headers=SERVER_CARD_HEADERS)
+    return Response(
+        content=SERVER_CARD_BODY,
+        media_type=mcp.SERVER_CARD_MEDIA_TYPE,
+        headers=SERVER_CARD_HEADERS,
+    )
+
+
+# If-None-Match is not a CORS-safelisted header, so a browser client that
+# revalidates sends a preflight first.
+@app.options("/mcp/server-card", include_in_schema=False)
+async def mcp_server_card_preflight():
+    return Response(status_code=204, headers=SERVER_CARD_HEADERS)
 
 
 # ── /mcp (Model Context Protocol, revision 2026-07-28) ───────────────────────

@@ -122,7 +122,33 @@ def main_() -> int:
     check("ARD manifest carries the MCP entry",
           r.status_code == 200
           and len(r.json()["entries"]) == 2
-          and r.json()["entries"][1]["data"]["url"].endswith("/mcp"))
+          and r.json()["entries"][1]["data"]["remotes"][0]["url"].endswith("/mcp"))
+
+    # Server Card at the SEP-2127 reserved location, with the media type, CORS
+    # and validator headers the spec's discovery document requires.
+    logged.clear()
+    r = client.get("/mcp/server-card", headers={"User-Agent": "Mozilla/5.0 (compatible; GPTBot/1.2)"})
+    check("server card -> 200", r.status_code == 200, str(r.status_code))
+    check("server card media type",
+          r.headers["content-type"].startswith("application/mcp-server-card+json"),
+          r.headers["content-type"])
+    check("server card is the inlined ARD card",
+          r.json() == main.build_ai_catalog(main.SITE_BASE_URL)["entries"][1]["data"])
+    check("server card allows any origin", r.headers.get("access-control-allow-origin") == "*")
+    check("server card is cacheable", "max-age=3600" in r.headers.get("cache-control", ""))
+    check("server card read is logged", logged == ["/mcp/server-card"], str(logged))
+    etag = r.headers.get("etag")
+    r = client.get("/mcp/server-card", headers={"User-Agent": "probe/5", "If-None-Match": etag or "x"})
+    check("matching If-None-Match -> 304", bool(etag) and r.status_code == 304, str(r.status_code))
+    r = client.options("/mcp/server-card", headers={
+        "Origin": "https://example.com", "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "if-none-match"})
+    check("CORS preflight -> 204 allowing If-None-Match",
+          r.status_code == 204
+          and "If-None-Match" in r.headers.get("access-control-allow-headers", ""),
+          str(r.status_code))
+    check("server card path feeds the MCP manifest column",
+          "/mcp/server-card" in main.MCP_MANIFEST_PATHS)
     r = client.get("/llms.txt", headers={"User-Agent": "probe/2"})
     check("llms.txt names /mcp", "/mcp" in r.text)
     r = client.get("/.well-known/agents.md", headers={"User-Agent": "probe/3"})

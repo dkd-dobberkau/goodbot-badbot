@@ -11,6 +11,7 @@ No DB and no HTTP client: app.mcp.handle_rpc is a pure function.
 """
 import datetime
 import json
+import re
 import sys
 
 from app.mcp import (
@@ -18,7 +19,6 @@ from app.mcp import (
     INVALID_PARAMS,
     METHOD_NOT_FOUND,
     PROTOCOL_VERSION,
-    TOOLS,
     UNSUPPORTED_PROTOCOL_VERSION,
     build_server_card,
     decode_header_value,
@@ -278,12 +278,27 @@ def main() -> int:
     )
     check("base64-encoded Mcp-Name matches the body", status == 200)
 
-    # ── ARD server card ──────────────────────────────────────────────────────
+    # ── Server Card (SEP-2127, schema v1) ────────────────────────────────────
+    # Constraints pinned from the extension repo's schema.ts, because the
+    # scanner that first flagged this checked a different, pre-final shape.
     card = build_server_card("https://goodbot-badbot.com/mcp")
+    check("server card declares the v1 schema",
+          card["$schema"] == "https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json")
+    check("server card name is reverse-DNS with one slash",
+          re.fullmatch(r"[a-zA-Z0-9.-]+/[a-zA-Z0-9._-]+", card["name"]) is not None)
+    check("server card has a version", bool(card["version"]))
+    check("server card description is 1-100 chars",
+          1 <= len(card["description"]) <= 100)
     check("server card points at the endpoint",
-          card["url"] == "https://goodbot-badbot.com/mcp")
-    check("server card tool list matches the served tools",
-          [t["name"] for t in card["tools"]] == [t["name"] for t in TOOLS])
+          card["remotes"] == [{"type": "streamable-http",
+                               "url": "https://goodbot-badbot.com/mcp",
+                               "supportedProtocolVersions": [PROTOCOL_VERSION]}])
+    check("server card lists no primitives or capabilities",
+          not {"tools", "resources", "prompts", "capabilities"} & card.keys())
+    status, res = call("server/discover")
+    discovered = res["result"]["_meta"]["io.modelcontextprotocol/serverInfo"]
+    check("server card identity matches server/discover",
+          (card["name"], card["version"]) == (discovered["name"], discovered["version"]))
     blob = json.dumps(card)
     for trap in ("/do-not-crawl", "/honeypot", "/training-data-forbidden",
                  "/no-ai-allowed", "/robots-test"):
